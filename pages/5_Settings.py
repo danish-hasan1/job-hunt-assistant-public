@@ -44,8 +44,8 @@ st.markdown("---")
 profile = st.session_state.get("user_profile", {})
 
 
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["👤 Profile", "🔑 API Keys", "🔄 Reset", "🔔 Job Alerts"]
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    ["👤 Profile", "🔑 API Keys", "🔄 Reset", "🔔 Job Alerts", "🎁 Refer Friends"]
 )
 
 
@@ -272,3 +272,46 @@ with tab4:
                     st.error("Failed to send. Check Gmail credentials.")
             else:
                 st.warning("Search for jobs first to test alerts")
+
+
+with tab5:
+    st.subheader("🎁 Refer Friends")
+    st.caption("Share Job Hunt Assistant with friends and track who you've helped!")
+
+    from engines.referral import get_or_create_referral_code, get_referral_stats
+
+    email = st.session_state.get("user_email", "")
+    profile = st.session_state.get("user_profile", {})
+    name = profile.get("name", "User")
+
+    code = get_or_create_referral_code(email, name)
+
+    if code:
+        st.markdown("**Your unique referral link:**")
+        referral_url = f"https://job-hunt-assistant-public.streamlit.app?ref={code}"
+        st.code(referral_url)
+        st.caption(
+            "Share this link with friends. When they sign up, they'll be linked to you."
+        )
+
+        st.markdown("**Share message:**")
+        share_msg = f"""Hey! I've been using this free AI-powered job search tool called Job Hunt Assistant. 
+
+ It finds jobs across the internet, scores them against your profile, tailors your CV automatically and even helps prep for interviews — all free! 
+
+ Sign up here: {referral_url}"""
+        st.text_area("Copy and share:", share_msg, height=150, key="share_msg")
+
+        st.markdown("---")
+        st.markdown("**Your referrals:**")
+        referrals = get_referral_stats(email)
+        if not referrals:
+            st.info("No referrals yet. Share your link to get started!")
+        else:
+            st.success(f"🎉 You've referred {len(referrals)} people!")
+            for r in referrals:
+                st.markdown(
+                    f"✅ {r['referred_email']} — joined {r['created_at'][:10]}"
+                )
+    else:
+        st.error("Could not generate referral code. Try refreshing.")

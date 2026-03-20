@@ -78,6 +78,11 @@ with tab2:
     reg_email = st.text_input("Email", placeholder="you@gmail.com", key="reg_email")
     reg_pass = st.text_input("Password", type="password", key="reg_pass")
     reg_pass2 = st.text_input("Confirm Password", type="password", key="reg_pass2")
+    ref_code = st.text_input(
+        "Referral code (optional)",
+        placeholder="DANISH1234",
+        key="ref_code",
+    )
     if st.button("📝 Create Account", key="reg_btn"):
         if reg_name and reg_email and reg_pass:
             if reg_pass != reg_pass2:
@@ -98,6 +103,10 @@ with tab2:
                     },
                 )
                 if ok:
+                    if ref_code:
+                        from engines.referral import apply_referral_code
+
+                        apply_referral_code(reg_email, ref_code)
                     st.session_state.logged_in = True
                     st.session_state.user_email = reg_email
                     st.session_state.user_profile = {

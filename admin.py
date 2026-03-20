@@ -91,7 +91,7 @@ with c5:
 st.markdown("---")
 
 
-tab1, tab2, tab3 = st.tabs(["👥 Users", "📈 Events", "🌍 Markets"])
+tab1, tab2, tab3, tab4 = st.tabs(["👥 Users", "📈 Events", "🌍 Markets", "🎁 Referrals"])
 
 
 with tab1:
@@ -157,3 +157,15 @@ with tab3:
             df_roles = df_roles.sort_values("Users", ascending=False)
             st.dataframe(df_roles, use_container_width=True, hide_index=True)
 
+
+with tab4:
+    st.subheader("Referral Leaderboard")
+    from engines.referral import get_referral_leaderboard
+
+    leaderboard = get_referral_leaderboard()
+    if leaderboard:
+        df = pd.DataFrame(leaderboard)[["name", "email", "referrals"]]
+        df.columns = ["Name", "Email", "Referrals"]
+        st.dataframe(df, use_container_width=True, hide_index=True)
+    else:
+        st.info("No referrals yet")
