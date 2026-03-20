@@ -2,6 +2,9 @@ import streamlit as st
 from datetime import date
 
 
+if not st.session_state.get("logged_in"):
+    st.switch_page("pages/login.py")
+
 if "setup_complete" not in st.session_state or not st.session_state.setup_complete:
     st.switch_page("pages/0_Setup.py")
 
@@ -18,6 +21,17 @@ h1,h2,h3,p,label{color:white!important}
 </style>""",
     unsafe_allow_html=True,
 )
+
+
+with st.sidebar:
+    st.markdown(
+        f"👤 **{st.session_state.get('user_profile', {}).get('name', '')}**"
+    )
+    st.caption(st.session_state.get("user_email", ""))
+    if st.button("🚪 Logout"):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.switch_page("pages/login.py")
 
 st.title("💼 Job Listings")
 st.markdown("---")

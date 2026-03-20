@@ -20,6 +20,10 @@ h1,h2,h3,p,label,.stMarkdown{color:white!important}
     unsafe_allow_html=True,
 )
 
+
+if not st.session_state.get("logged_in"):
+    st.switch_page("pages/login.py")
+
 if "setup_step" not in st.session_state:
     st.session_state.setup_step = 1
 
@@ -179,6 +183,26 @@ elif st.session_state.setup_step == 3:
                 st.session_state.gmail_password = gmail_pass
                 st.session_state.gemini_key = gemini_key
                 st.session_state.setup_complete = True
+                try:
+                    from engines.auth import save_user_data
+                    from engines.tracker import track_signup
+
+                    email = st.session_state.get("user_email", "")
+                    if email:
+                        save_user_data(
+                            email,
+                            "api_keys",
+                            {
+                                "groq": groq_key,
+                                "serpapi": serpapi_key,
+                                "gmail": gmail,
+                                "gmail_pass": gmail_pass,
+                                "gemini": gemini_key,
+                            },
+                        )
+                        track_signup(st.session_state.user_profile)
+                except Exception:
+                    pass
                 st.session_state.setup_step = 4
                 try:
                     from engines.tracker import track_signup
