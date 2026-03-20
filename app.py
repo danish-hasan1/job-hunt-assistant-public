@@ -10,7 +10,7 @@ st.set_page_config(
 
 
 if not st.session_state.get("logged_in"):
-    st.switch_page("pages/login.py")
+    st.switch_page("pages/landing.py")
 elif not st.session_state.get("setup_complete"):
     st.switch_page("pages/0_Setup.py")
 else:
