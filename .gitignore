@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+.DS_Store
+venv/
+*.db
+applications/
+prep_packs/
+linkedin_session.json
+linkedin_cookies.json
