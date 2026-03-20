@@ -59,6 +59,14 @@ if st.session_state.setup_step == 1:
         cv_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
         st.session_state.cv_text = cv_text
         st.session_state.cv_bytes = cv_file.getvalue()
+        try:
+            from engines.auth import save_cv
+
+            email = st.session_state.get("user_email", "")
+            if email:
+                save_cv(email, cv_file.getvalue())
+        except Exception:
+            pass
         st.success(f"✅ CV uploaded! ({len(cv_text)} characters)")
         st.text_area("Preview:", cv_text[:400] + "...", height=120)
     if st.button("Next →"):
@@ -242,6 +250,16 @@ elif st.session_state.setup_step == 3:
                 st.session_state.gmail_address = gmail
                 st.session_state.gmail_password = gmail_pass
                 st.session_state.gemini_key = gemini_key
+                try:
+                    from engines.auth import save_api_keys
+
+                    email = st.session_state.get("user_email", "")
+                    if email:
+                        save_api_keys(
+                            email, groq_key, serpapi_key, gmail, gmail_pass, gemini_key
+                        )
+                except Exception:
+                    pass
                 st.session_state.setup_complete = True
                 try:
                     from engines.auth import save_user_data

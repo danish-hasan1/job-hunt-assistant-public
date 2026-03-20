@@ -47,15 +47,15 @@ with tab1:
                     "target_markets": json.loads(user.get("target_markets", "[]")),
                     "years_experience": user.get("years_experience", 0),
                 }
-                from engines.auth import load_user_data
+                from engines.auth import load_session_data
 
-                jobs = load_user_data(email, "jobs")
-                apps = load_user_data(email, "applications")
-                keys = load_user_data(email, "api_keys")
+                keys, jobs, applications, cv_bytes = load_session_data(email)
                 if jobs:
                     st.session_state.jobs = jobs
-                if apps:
-                    st.session_state.applications = apps
+                if applications:
+                    st.session_state.applications = applications
+                if cv_bytes:
+                    st.session_state.cv_bytes = cv_bytes
                 if keys:
                     st.session_state.groq_key = keys.get("groq", "")
                     st.session_state.serpapi_key = keys.get("serpapi", "")
@@ -111,4 +111,3 @@ with tab2:
                     st.error(msg)
         else:
             st.warning("Please fill all fields")
-

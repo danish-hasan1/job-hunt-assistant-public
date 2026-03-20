@@ -1,6 +1,7 @@
 import hashlib
 import json
 from datetime import datetime
+import base64
 
 SUPABASE_URL = "https://ggdnrhrwgyezzccrcwyq.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnZG5yaHJ3Z3llenpjY3Jjd3lxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMDUxMDQsImV4cCI6MjA4OTU4MTEwNH0.4W6scrIGIJl56y4NN7MI2iHBx5Q-ZmlViottew91iLc"
@@ -64,12 +65,62 @@ def save_user_data(email, data_type, data):
 def load_user_data(email, data_type):
     try:
         client = get_client()
-        result = client.table('user_data').select('data').eq('email', email).eq('data_type', data_type).execute()
+        result = (
+            client.table("user_data")
+            .select("data")
+            .eq("email", email)
+            .eq("data_type", data_type)
+            .execute()
+        )
         if result.data:
-            return json.loads(result.data[0]['data'])
+            return json.loads(result.data[0]["data"])
         return None
     except Exception as e:
         return None
+
+
+def save_cv(email, cv_bytes):
+    try:
+        encoded = base64.b64encode(cv_bytes).decode("utf-8")
+        save_user_data(email, "cv_bytes", encoded)
+        return True
+    except Exception as e:
+        print(f"CV save error: {e}")
+        return False
+
+
+def load_cv(email):
+    try:
+        encoded = load_user_data(email, "cv_bytes")
+        if encoded:
+            return base64.b64decode(encoded.encode("utf-8"))
+        return None
+    except Exception as e:
+        print(f"CV load error: {e}")
+        return None
+
+
+def save_api_keys(email, groq, serpapi, gmail, gmail_pass, gemini):
+    save_user_data(
+        email,
+        "api_keys",
+        {
+            "groq": groq,
+            "serpapi": serpapi,
+            "gmail": gmail,
+            "gmail_pass": gmail_pass,
+            "gemini": gemini,
+        },
+    )
+
+
+def load_session_data(email):
+    keys = load_user_data(email, "api_keys") or {}
+    jobs = load_user_data(email, "jobs") or []
+    applications = load_user_data(email, "applications") or []
+    cv_bytes = load_cv(email)
+    return keys, jobs, applications, cv_bytes
+
 
 if __name__ == "__main__":
     print("Auth engine ready ✓")
