@@ -2,6 +2,50 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
+CITY_OPTIONS = [
+    "Amsterdam, Netherlands",
+    "Barcelona, Spain",
+    "Berlin, Germany",
+    "Brussels, Belgium",
+    "Dublin, Ireland",
+    "Frankfurt, Germany",
+    "Hamburg, Germany",
+    "Lisbon, Portugal",
+    "London, UK",
+    "Madrid, Spain",
+    "Manchester, UK",
+    "Milan, Italy",
+    "Munich, Germany",
+    "Paris, France",
+    "Rome, Italy",
+    "Stockholm, Sweden",
+    "Vienna, Austria",
+    "Zurich, Switzerland",
+    "Bangalore, India",
+    "Chennai, India",
+    "Delhi, India",
+    "Gurgaon, India",
+    "Hyderabad, India",
+    "Mumbai, India",
+    "Pune, India",
+    "Singapore",
+    "Dubai, UAE",
+    "Abu Dhabi, UAE",
+    "Doha, Qatar",
+    "New York, USA",
+    "Boston, USA",
+    "Chicago, USA",
+    "San Francisco, USA",
+    "Seattle, USA",
+    "Toronto, Canada",
+    "Vancouver, Canada",
+    "Sydney, Australia",
+    "Melbourne, Australia",
+    "Auckland, New Zealand",
+    "Remote",
+    "Hybrid",
+]
+
 
 if not st.session_state.get("logged_in"):
     st.switch_page("pages/login.py")
@@ -96,11 +140,24 @@ with st.expander("⚙️ Search Settings", expanded=True):
             profile.get("location", "")
             or (", ".join(profile.get("target_markets", [])) if profile.get("target_markets") else ""),
         )
-        location = st.text_input(
+        city_options = ["Custom / Other"] + CITY_OPTIONS
+        if default_location and default_location in CITY_OPTIONS:
+            default_index = city_options.index(default_location)
+        else:
+            default_index = 0
+        city_choice = st.selectbox(
             "Location (city or market)",
-            placeholder="e.g. Hyderabad, Spain, Europe, Remote",
-            value=default_location,
+            city_options,
+            index=default_index,
         )
+        custom_location = ""
+        if city_choice == "Custom / Other":
+            custom_location = st.text_input(
+                "Custom location",
+                placeholder="e.g. Hyderabad, Spain, Europe, Remote",
+                value=default_location if default_location not in CITY_OPTIONS else "",
+            )
+        location = custom_location or (city_choice if city_choice != "Custom / Other" else "")
     with c2:
         seniority = st.multiselect(
             "Seniority",

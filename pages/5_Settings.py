@@ -93,6 +93,7 @@ with tab1:
                 else 0,
             )
     suggested_roles = []
+    cv_notes = {}
     try:
         from engines.gemini_engine import load_cv_notes
 
@@ -114,34 +115,71 @@ with tab1:
         suggested_roles = []
 
     base_roles = [
-        "Talent Acquisition Manager",
-        "Head of Talent",
-        "VP Talent",
-        "RPO Manager",
-        "Associate Director Recruitment",
-        "Recruitment Director",
-        "Senior TA Manager",
+        "Product Manager",
+        "Project Manager",
+        "Operations Manager",
+        "Business Analyst",
+        "Customer Success Manager",
+        "Sales Manager",
+        "Marketing Manager",
+        "Head of Department",
     ]
     role_options = []
-    for r in suggested_roles + base_roles:
+    for r in suggested_roles + base_roles + profile.get("target_roles", []):
         if r and r not in role_options:
             role_options.append(r)
     existing_roles = profile.get("target_roles", [])
-    default_roles = existing_roles or suggested_roles
+    default_roles = existing_roles or suggested_roles or base_roles[:2]
     target_roles = st.multiselect(
         "Target Roles",
         role_options,
         default=default_roles,
     )
+    extra_existing_roles = [r for r in existing_roles if r not in default_roles]
     other_roles = st.text_input(
         "Other roles (comma-separated, optional)",
-        value="",
+        value=", ".join(extra_existing_roles),
         key="settings_other_target_roles",
+    )
+    markets_suggested = []
+    strategy = cv_notes.get("job_search_strategy", {}) if isinstance(cv_notes, dict) else {}
+    for key in ["markets", "locations", "target_locations"]:
+        val = strategy.get(key, [])
+        if isinstance(val, str):
+            markets_suggested.append(val)
+        elif isinstance(val, list):
+            markets_suggested.extend(val)
+    base_markets = [
+        "Remote",
+        "Global",
+        "Europe",
+        "North America",
+        "UK",
+        "India",
+        "Middle East",
+        "APAC",
+        "Latin America",
+    ]
+    saved_markets = profile.get("target_markets", [])
+    market_options = []
+    for m in markets_suggested + base_markets + saved_markets:
+        if m and m not in market_options:
+            market_options.append(m)
+    default_markets = (
+        [m for m in saved_markets if m in market_options]
+        or markets_suggested
+        or base_markets[:2]
     )
     target_markets = st.multiselect(
         "Target Markets",
-        ["Spain", "Belgium", "France", "Netherlands", "UK", "Germany", "Europe", "India", "UAE"],
-        default=profile.get("target_markets", []),
+        market_options,
+        default=default_markets,
+    )
+    extra_existing_markets = [m for m in saved_markets if m not in default_markets]
+    other_markets = st.text_input(
+        "Other markets (comma-separated, optional)",
+        value=", ".join(extra_existing_markets),
+        key="settings_other_target_markets",
     )
     if st.button("💾 Save Profile"):
         st.session_state.user_profile.update(
@@ -158,7 +196,8 @@ with tab1:
                 "min_salary_eur": min_salary,
                 "target_roles": target_roles
                 + [r.strip() for r in other_roles.split(",") if r.strip()],
-                "target_markets": target_markets,
+                "target_markets": target_markets
+                + [m.strip() for m in other_markets.split(",") if m.strip()],
             }
         )
         st.success("✅ Profile saved!")

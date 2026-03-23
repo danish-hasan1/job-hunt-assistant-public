@@ -3,6 +3,50 @@ import json
 from docx import Document
 import io
 
+CITY_OPTIONS = [
+    "Amsterdam, Netherlands",
+    "Barcelona, Spain",
+    "Berlin, Germany",
+    "Brussels, Belgium",
+    "Dublin, Ireland",
+    "Frankfurt, Germany",
+    "Hamburg, Germany",
+    "Lisbon, Portugal",
+    "London, UK",
+    "Madrid, Spain",
+    "Manchester, UK",
+    "Milan, Italy",
+    "Munich, Germany",
+    "Paris, France",
+    "Rome, Italy",
+    "Stockholm, Sweden",
+    "Vienna, Austria",
+    "Zurich, Switzerland",
+    "Bangalore, India",
+    "Chennai, India",
+    "Delhi, India",
+    "Gurgaon, India",
+    "Hyderabad, India",
+    "Mumbai, India",
+    "Pune, India",
+    "Singapore",
+    "Dubai, UAE",
+    "Abu Dhabi, UAE",
+    "Doha, Qatar",
+    "New York, USA",
+    "Boston, USA",
+    "Chicago, USA",
+    "San Francisco, USA",
+    "Seattle, USA",
+    "Toronto, Canada",
+    "Vancouver, Canada",
+    "Sydney, Australia",
+    "Melbourne, Australia",
+    "Auckland, New Zealand",
+    "Remote",
+    "Hybrid",
+]
+
 st.set_page_config(
     page_title="Setup - Job Hunt Assistant",
     page_icon="🎯",
@@ -81,30 +125,80 @@ if st.session_state.setup_step == 1:
 
 elif st.session_state.setup_step == 2:
     st.subheader("👤 Step 2: Your Profile")
+    existing_profile = st.session_state.get("user_profile", {})
     c1, c2 = st.columns(2)
     with c1:
-        name = st.text_input("Full Name *", placeholder="Your Name")
-        email = st.text_input("Email *", placeholder="you@gmail.com")
-        phone = st.text_input("Phone", placeholder="+91 9999999999")
-        experience = st.number_input("Years Experience", 0, 40, 5)
-    with c2:
-        location = st.text_input("Current Location", placeholder="City, Country")
-        relocate = st.selectbox("Open to Relocate?", ["Yes", "No"])
-        notice = st.selectbox(
-            "Notice Period",
-            ["Immediate", "2 weeks", "1 month", "2 months", "3 months"],
+        name = st.text_input(
+            "Full Name *", placeholder="Your Name", value=existing_profile.get("name", "")
         )
+        email = st.text_input(
+            "Email *", placeholder="you@gmail.com", value=existing_profile.get("email", "")
+        )
+        phone = st.text_input(
+            "Phone", placeholder="+91 9999999999", value=existing_profile.get("phone", "")
+        )
+        experience = st.number_input(
+            "Years Experience",
+            0,
+            40,
+            int(existing_profile.get("years_experience", 5)),
+        )
+    with c2:
+        existing_location = existing_profile.get("location", "")
+        city_options = ["Custom / Other"] + CITY_OPTIONS
+        if existing_location and existing_location in CITY_OPTIONS:
+            default_index = city_options.index(existing_location)
+        else:
+            default_index = 0
+        city_choice = st.selectbox(
+            "Current Location",
+            city_options,
+            index=default_index,
+        )
+        custom_location = ""
+        if city_choice == "Custom / Other":
+            custom_location = st.text_input(
+                "Enter location",
+                placeholder="City, Country",
+                value=existing_location if existing_location not in CITY_OPTIONS else "",
+            )
+        location = custom_location or (city_choice if city_choice != "Custom / Other" else "")
+        relocate_default = "Yes" if existing_profile.get("relocate", True) else "No"
+        relocate = st.selectbox(
+            "Open to Relocate?",
+            ["Yes", "No"],
+            index=["Yes", "No"].index(relocate_default),
+        )
+        notice_options = ["Immediate", "2 weeks", "1 month", "2 months", "3 months"]
+        existing_notice = existing_profile.get("notice_period")
+        notice_index = (
+            notice_options.index(existing_notice)
+            if existing_notice in notice_options
+            else 0
+        )
+        notice = st.selectbox("Notice Period", notice_options, index=notice_index)
         sc1, sc2 = st.columns([2, 1])
         with sc1:
             min_salary = st.text_input(
-                "Min Salary (Annual)", placeholder="60000 (annual)"
+                "Min Salary (Annual)",
+                placeholder="60000 (annual)",
+                value=str(existing_profile.get("min_salary", "")),
             )
         with sc2:
+            currency_options = ["EUR", "GBP", "USD", "INR", "AED", "CAD", "AUD", "SGD"]
+            existing_currency = existing_profile.get("salary_currency", "EUR")
+            currency_index = (
+                currency_options.index(existing_currency)
+                if existing_currency in currency_options
+                else 0
+            )
             salary_currency = st.selectbox(
                 "Currency",
-                ["EUR", "GBP", "USD", "INR", "AED", "CAD", "AUD", "SGD"],
+                currency_options,
+                index=currency_index,
             )
     suggested_roles = []
+    cv_notes = {}
     try:
         from engines.gemini_engine import load_cv_notes
 
@@ -126,36 +220,114 @@ elif st.session_state.setup_step == 2:
         suggested_roles = []
 
     base_roles = [
-        "Talent Acquisition Manager",
-        "Head of Talent",
-        "VP Talent",
-        "RPO Manager",
-        "Associate Director Recruitment",
-        "Recruitment Director",
-        "Senior TA Manager",
+        "Product Manager",
+        "Project Manager",
+        "Operations Manager",
+        "Business Analyst",
+        "Customer Success Manager",
+        "Sales Manager",
+        "Marketing Manager",
+        "Head of Department",
     ]
+    saved_roles = existing_profile.get("target_roles", [])
     role_options = []
-    for r in suggested_roles + base_roles:
+    for r in suggested_roles + base_roles + saved_roles:
         if r and r not in role_options:
             role_options.append(r)
-    default_roles = suggested_roles or ["Head of Talent", "RPO Manager"]
+    default_roles = (
+        [r for r in saved_roles if r in role_options]
+        or suggested_roles
+        or base_roles[:2]
+    )
     target_roles = st.multiselect(
         "Target Roles *",
         role_options,
         default=default_roles,
     )
+    existing_extra_roles = [r for r in saved_roles if r not in default_roles]
     other_roles = st.text_input(
-        "Other roles (comma-separated, optional)", key="other_target_roles"
+        "Other roles (comma-separated, optional)",
+        value=", ".join(existing_extra_roles),
+        key="other_target_roles",
+    )
+    markets_suggested = []
+    strategy = cv_notes.get("job_search_strategy", {}) if isinstance(cv_notes, dict) else {}
+    for key in ["markets", "locations", "target_locations"]:
+        val = strategy.get(key, [])
+        if isinstance(val, str):
+            markets_suggested.append(val)
+        elif isinstance(val, list):
+            markets_suggested.extend(val)
+    base_markets = [
+        "Remote",
+        "Global",
+        "Europe",
+        "North America",
+        "UK",
+        "India",
+        "Middle East",
+        "APAC",
+        "Latin America",
+    ]
+    saved_markets = existing_profile.get("target_markets", [])
+    market_options = []
+    for m in markets_suggested + base_markets + saved_markets:
+        if m and m not in market_options:
+            market_options.append(m)
+    default_markets = (
+        [m for m in saved_markets if m in market_options]
+        or markets_suggested
+        or base_markets[:2]
     )
     target_markets = st.multiselect(
         "Target Markets *",
-        ["Spain", "Belgium", "France", "Netherlands", "UK", "Germany", "Europe", "India", "UAE"],
-        default=["Spain", "Belgium", "France", "Europe"],
+        market_options,
+        default=default_markets,
+    )
+    existing_extra_markets = [m for m in saved_markets if m not in default_markets]
+    other_markets = st.text_input(
+        "Other markets (comma-separated, optional)",
+        value=", ".join(existing_extra_markets),
+        key="other_target_markets",
+    )
+    cv_industries = []
+    if isinstance(cv_notes, dict):
+        val = cv_notes.get("industries", [])
+        if isinstance(val, str):
+            cv_industries.append(val)
+        elif isinstance(val, list):
+            cv_industries.extend(val)
+    base_industries = [
+        "Tech",
+        "Finance",
+        "Consulting",
+        "Healthcare",
+        "Life Sciences",
+        "Manufacturing",
+        "Retail",
+        "Public Sector",
+        "Any",
+    ]
+    saved_industries = existing_profile.get("industries", [])
+    industry_options = []
+    for i in cv_industries + base_industries + saved_industries:
+        if i and i not in industry_options:
+            industry_options.append(i)
+    default_industries = (
+        [i for i in saved_industries if i in industry_options]
+        or cv_industries
+        or base_industries[:2]
     )
     industries = st.multiselect(
         "Preferred Industries",
-        ["Pharma", "Life Sciences", "Tech", "Finance", "Consulting", "FMCG", "Any"],
-        default=["Pharma", "Tech", "Consulting"],
+        industry_options,
+        default=default_industries,
+    )
+    existing_extra_industries = [i for i in saved_industries if i not in default_industries]
+    other_industries = st.text_input(
+        "Other industries (comma-separated, optional)",
+        value=", ".join(existing_extra_industries),
+        key="other_preferred_industries",
     )
     cb, cn = st.columns(2)
     with cb:
@@ -169,15 +341,19 @@ elif st.session_state.setup_step == 2:
                 missing.append("Full Name")
             if not email.strip():
                 missing.append("Email")
-            extra_roles = [
-                r.strip() for r in other_roles.split(",") if r.strip()
-            ]
+            extra_roles = [r.strip() for r in other_roles.split(",") if r.strip()]
             all_roles = target_roles + extra_roles
             if not all_roles:
                 missing.append("Target Roles")
-            if not target_markets:
+            extra_markets = [m.strip() for m in other_markets.split(",") if m.strip()]
+            all_markets = target_markets + extra_markets
+            if not all_markets:
                 missing.append("Target Markets")
             if not missing:
+                extra_industries = [
+                    i.strip() for i in other_industries.split(",") if i.strip()
+                ]
+                all_industries = industries + extra_industries
                 st.session_state.user_profile = {
                     "name": name,
                     "email": email,
@@ -190,9 +366,9 @@ elif st.session_state.setup_step == 2:
                     "min_salary_eur": min_salary,
                     "years_experience": experience,
                     "target_roles": all_roles,
-                    "target_markets": target_markets,
-                    "industries": industries,
-                    "experience_markets": target_markets or ([location] if location else []),
+                    "target_markets": all_markets,
+                    "industries": all_industries,
+                    "experience_markets": all_markets or ([location] if location else []),
                     "skills": [],
                 }
                 st.session_state.setup_step = 3
