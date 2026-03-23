@@ -2,50 +2,74 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-CITY_OPTIONS = [
-    "Amsterdam, Netherlands",
-    "Barcelona, Spain",
-    "Berlin, Germany",
-    "Brussels, Belgium",
-    "Dublin, Ireland",
-    "Frankfurt, Germany",
-    "Hamburg, Germany",
-    "Lisbon, Portugal",
-    "London, UK",
-    "Madrid, Spain",
-    "Manchester, UK",
-    "Milan, Italy",
-    "Munich, Germany",
-    "Paris, France",
-    "Rome, Italy",
-    "Stockholm, Sweden",
-    "Vienna, Austria",
-    "Zurich, Switzerland",
-    "Bangalore, India",
-    "Chennai, India",
-    "Delhi, India",
-    "Gurgaon, India",
-    "Hyderabad, India",
-    "Mumbai, India",
-    "Pune, India",
-    "Singapore",
-    "Dubai, UAE",
-    "Abu Dhabi, UAE",
-    "Doha, Qatar",
-    "New York, USA",
-    "Boston, USA",
-    "Chicago, USA",
-    "San Francisco, USA",
-    "Seattle, USA",
-    "Toronto, Canada",
-    "Vancouver, Canada",
-    "Sydney, Australia",
-    "Melbourne, Australia",
-    "Auckland, New Zealand",
-    "Remote",
-    "Hybrid",
-]
+try:
+    import geonamescache
+except ImportError:
+    geonamescache = None
 
+
+@st.cache_resource
+def get_city_options():
+    if geonamescache is None:
+        return [
+            "Amsterdam, Netherlands",
+            "Barcelona, Spain",
+            "Berlin, Germany",
+            "Brussels, Belgium",
+            "Dublin, Ireland",
+            "Frankfurt, Germany",
+            "Hamburg, Germany",
+            "Lisbon, Portugal",
+            "London, UK",
+            "Madrid, Spain",
+            "Manchester, UK",
+            "Milan, Italy",
+            "Munich, Germany",
+            "Paris, France",
+            "Rome, Italy",
+            "Stockholm, Sweden",
+            "Vienna, Austria",
+            "Zurich, Switzerland",
+            "Bangalore, India",
+            "Chennai, India",
+            "Delhi, India",
+            "Gurgaon, India",
+            "Hyderabad, India",
+            "Mumbai, India",
+            "Pune, India",
+            "Singapore",
+            "Dubai, UAE",
+            "Abu Dhabi, UAE",
+            "Doha, Qatar",
+            "New York, USA",
+            "Boston, USA",
+            "Chicago, USA",
+            "San Francisco, USA",
+            "Seattle, USA",
+            "Toronto, Canada",
+            "Vancouver, Canada",
+            "Sydney, Australia",
+            "Melbourne, Australia",
+            "Auckland, New Zealand",
+            "Remote",
+            "Hybrid",
+        ]
+    gc = geonamescache.GeonamesCache()
+    countries = gc.get_countries()
+    raw_cities = gc.get_cities().values()
+    names = set()
+    for c in raw_cities:
+        code = c.get("countrycode")
+        country = countries.get(code, {}).get("name", "")
+        if country:
+            names.add(f"{c.get('name')}, {country}")
+        else:
+            names.add(c.get("name"))
+    names.update(["Remote", "Hybrid"])
+    return sorted(names)
+
+
+CITY_OPTIONS = get_city_options()
 
 if not st.session_state.get("logged_in"):
     st.switch_page("pages/login.py")
@@ -57,7 +81,7 @@ if "setup_complete" not in st.session_state or not st.session_state.setup_comple
 profile = st.session_state.get("user_profile", {})
 
 
-st.set_page_config(page_title="Job Hunt Assistant", page_icon="🎯", layout="wide")
+st.set_page_config(page_title="🎯 Home - Job Hunt Assistant", page_icon="🎯", layout="wide")
 
 
 st.markdown(
@@ -71,7 +95,8 @@ h1,h2,h3,p,label{color:white!important}
 .metric-value{font-size:2.5em;font-weight:bold;color:#e94560}
 .metric-label{font-size:0.9em;color:#aaa;margin-top:5px}
 .stButton>button{background:#e94560!important;color:white!important;border:none;border-radius:8px;font-weight:bold}
-div[data-testid="stSidebarNav"] a[href*='app']{display:none!important}
+div[data-testid="stSidebarNav"] a{padding:8px 16px;margin:2px 8px;border-radius:8px;font-weight:500}
+div[data-testid="stSidebarNav"] a[aria-current="page"]{background:#1f2937!important;font-weight:600}
 div[data-testid="stSidebarNav"] a[href*='landing']{display:none!important}
 div[data-testid="stSidebarNav"] a[href*='login']{display:none!important}
 </style>""",
@@ -135,29 +160,19 @@ with st.expander("⚙️ Search Settings", expanded=True):
             placeholder="Head of Talent Acquisition",
             value=st.session_state.get("search_role", ""),
         )
-        default_location = st.session_state.get(
-            "search_location",
-            profile.get("location", "")
-            or (", ".join(profile.get("target_markets", [])) if profile.get("target_markets") else ""),
+        preferred_from_profile = profile.get("preferred_locations") or []
+        default_locations = st.session_state.get(
+            "search_locations",
+            preferred_from_profile
+            or ([profile.get("location")] if profile.get("location") else [])
+            or profile.get("target_markets", []),
         )
-        city_options = ["Custom / Other"] + CITY_OPTIONS
-        if default_location and default_location in CITY_OPTIONS:
-            default_index = city_options.index(default_location)
-        else:
-            default_index = 0
-        city_choice = st.selectbox(
+        locations = st.multiselect(
             "Location (city or market)",
-            city_options,
-            index=default_index,
+            CITY_OPTIONS,
+            default=[l for l in default_locations if l in CITY_OPTIONS],
+            placeholder="Type to search and select multiple locations",
         )
-        custom_location = ""
-        if city_choice == "Custom / Other":
-            custom_location = st.text_input(
-                "Custom location",
-                placeholder="e.g. Hyderabad, Spain, Europe, Remote",
-                value=default_location if default_location not in CITY_OPTIONS else "",
-            )
-        location = custom_location or (city_choice if city_choice != "Custom / Other" else "")
     with c2:
         seniority = st.multiselect(
             "Seniority",
@@ -173,7 +188,7 @@ with st.expander("⚙️ Search Settings", expanded=True):
         s.strip() for s in other_seniority.split(",") if s.strip()
     ]
     st.session_state.search_role = role
-    st.session_state.search_location = location
+    st.session_state.search_location = ", ".join(locations)
     st.session_state.search_seniority = seniority + extra_seniority
 
 
@@ -215,7 +230,30 @@ with col1:
 
 with col2:
     if st.button("🧠 Score All Jobs", use_container_width=True):
-        if st.session_state.get("groq_key") == "test_mode":
+        groq_key = st.session_state.get("groq_key", "")
+        if groq_key == "test_mode":
             st.info("Scoring skipped in test mode")
         else:
-            st.info("Scoring not implemented yet")
+            jobs = st.session_state.get("jobs", [])
+            if not jobs:
+                st.warning("No jobs to score yet. Run a search first.")
+            else:
+                profile = st.session_state.get("user_profile", {})
+                try:
+                    from scrapers.scraper_public import score_jobs_with_groq
+
+                    with st.spinner(f"Re-scoring {len(jobs)} jobs with updated profile..."):
+                        jobs = score_jobs_with_groq(jobs, profile, groq_key)
+                    st.session_state.jobs = jobs
+                    st.success("✅ All jobs re-scored")
+                    try:
+                        from engines.auth import save_user_data
+
+                        email = st.session_state.get("user_email", "")
+                        if email:
+                            save_user_data(email, "jobs", jobs)
+                    except Exception:
+                        pass
+                    st.rerun()
+                except Exception as e:
+                    st.error("Could not score jobs. Please check your Groq key and try again.")

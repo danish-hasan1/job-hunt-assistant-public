@@ -3,6 +3,7 @@ import json
 import google.genai as genai
 from dotenv import load_dotenv
 from groq import Groq
+from functools import lru_cache
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -13,6 +14,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 
+@lru_cache(maxsize=1)
 def load_cv_notes():
     try:
         with open("profile.json", "r") as f:

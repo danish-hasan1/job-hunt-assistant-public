@@ -130,7 +130,6 @@ Return: {{"score": 0-100, "reason": "one sentence"}}"""
                 result = json.loads(text.strip())
                 job["score"] = result.get("score", 0)
                 job["score_reason"] = result.get("reason", "")
-                time.sleep(0.5)
             except Exception:
                 job["score"] = 50
                 job["score_reason"] = "Scoring unavailable"

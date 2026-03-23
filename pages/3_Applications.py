@@ -10,7 +10,7 @@ if "setup_complete" not in st.session_state or not st.session_state.setup_comple
 
 
 st.set_page_config(
-    page_title="Applications - Job Hunt Assistant",
+    page_title="📋 Applications - Job Hunt Assistant",
     page_icon="📋",
     layout="wide",
 )
@@ -22,7 +22,8 @@ st.markdown(
 [data-testid="stHeader"]{background:#0f0f23!important}
 h1,h2,h3,p,label{color:white!important}
 .stButton>button{background:#e94560!important;color:white!important;border:none;border-radius:8px;font-weight:bold}
-div[data-testid="stSidebarNav"] a[href*='app']{display:none!important}
+div[data-testid="stSidebarNav"] a{padding:8px 16px;margin:2px 8px;border-radius:8px;font-weight:500}
+div[data-testid="stSidebarNav"] a[aria-current="page"]{background:#1f2937!important;font-weight:600}
 div[data-testid="stSidebarNav"] a[href*='landing']{display:none!important}
 div[data-testid="stSidebarNav"] a[href*='login']{display:none!important}
 </style>""",

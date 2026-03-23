@@ -9,7 +9,7 @@ if "setup_complete" not in st.session_state or not st.session_state.setup_comple
     st.switch_page("pages/0_Setup.py")
 
 
-st.set_page_config(page_title="Jobs - Job Hunt Assistant", page_icon="💼", layout="wide")
+st.set_page_config(page_title="💼 Jobs - Job Hunt Assistant", page_icon="💼", layout="wide")
 st.markdown(
     """<style>
 [data-testid="stAppViewContainer"]{background:#0f0f23}
@@ -18,7 +18,8 @@ st.markdown(
 [data-testid="stHeader"]{background:#0f0f23!important}
 h1,h2,h3,p,label{color:white!important}
 .stButton>button{background:#e94560!important;color:white!important;border:none;border-radius:8px;font-weight:bold}
-div[data-testid="stSidebarNav"] a[href*='app']{display:none!important}
+div[data-testid="stSidebarNav"] a{padding:8px 16px;margin:2px 8px;border-radius:8px;font-weight:500}
+div[data-testid="stSidebarNav"] a[aria-current="page"]{background:#1f2937!important;font-weight:600}
 div[data-testid="stSidebarNav"] a[href*='landing']{display:none!important}
 div[data-testid="stSidebarNav"] a[href*='login']{display:none!important}
 </style>""",
@@ -100,7 +101,7 @@ for job in filtered:
         if job.get("description"):
             st.markdown(f"**Description:** {job['description'][:300]}...")
         st.markdown("---")
-        ca, cb, cc, cd = st.columns(4)
+        ca, cb, cc, cd, ce = st.columns(5)
         with ca:
             if st.button("✅ Approve", key=f"ap_{job['id']}"):
                 job["status"] = "approved"
@@ -185,6 +186,29 @@ for job in filtered:
                 except Exception:
                     pass
                 st.rerun()
+        with ce:
+            linkedin_url = job.get("url", "")
+            if linkedin_url and "linkedin.com" in linkedin_url.lower():
+                if st.button("🔗 LinkedIn Easy Apply", key=f"ln_{job['id']}"):
+                    profile = st.session_state.get("user_profile", {})
+                    cv_bytes = st.session_state.get("cv_bytes", None)
+                    if not cv_bytes:
+                        st.warning("Please upload your CV in setup first")
+                    else:
+                        import tempfile, os
+
+                        with tempfile.NamedTemporaryFile(
+                            delete=False, suffix=".pdf"
+                        ) as tmp:
+                            tmp.write(cv_bytes)
+                            cv_path = tmp.name
+                        from engines.apply_agent import launch_apply
+
+                        success, message = launch_apply(job, cv_path, profile)
+                        if success:
+                            st.info(message)
+                        else:
+                            st.error(message)
 
         if st.session_state.get(f"cv_ready_{job['id']}"):
             st.info("📄 **Tailored Summary:**")

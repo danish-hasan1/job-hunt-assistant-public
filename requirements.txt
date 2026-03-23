@@ -7,6 +7,7 @@ reportlab
 requests
 python-dotenv
 pandas
+geonamescache
 supabase
 supabase
 supabase

@@ -3,52 +3,77 @@ import json
 from docx import Document
 import io
 
-CITY_OPTIONS = [
-    "Amsterdam, Netherlands",
-    "Barcelona, Spain",
-    "Berlin, Germany",
-    "Brussels, Belgium",
-    "Dublin, Ireland",
-    "Frankfurt, Germany",
-    "Hamburg, Germany",
-    "Lisbon, Portugal",
-    "London, UK",
-    "Madrid, Spain",
-    "Manchester, UK",
-    "Milan, Italy",
-    "Munich, Germany",
-    "Paris, France",
-    "Rome, Italy",
-    "Stockholm, Sweden",
-    "Vienna, Austria",
-    "Zurich, Switzerland",
-    "Bangalore, India",
-    "Chennai, India",
-    "Delhi, India",
-    "Gurgaon, India",
-    "Hyderabad, India",
-    "Mumbai, India",
-    "Pune, India",
-    "Singapore",
-    "Dubai, UAE",
-    "Abu Dhabi, UAE",
-    "Doha, Qatar",
-    "New York, USA",
-    "Boston, USA",
-    "Chicago, USA",
-    "San Francisco, USA",
-    "Seattle, USA",
-    "Toronto, Canada",
-    "Vancouver, Canada",
-    "Sydney, Australia",
-    "Melbourne, Australia",
-    "Auckland, New Zealand",
-    "Remote",
-    "Hybrid",
-]
+try:
+    import geonamescache
+except ImportError:
+    geonamescache = None
+
+
+@st.cache_resource
+def get_city_options():
+    if geonamescache is None:
+        return [
+            "Amsterdam, Netherlands",
+            "Barcelona, Spain",
+            "Berlin, Germany",
+            "Brussels, Belgium",
+            "Dublin, Ireland",
+            "Frankfurt, Germany",
+            "Hamburg, Germany",
+            "Lisbon, Portugal",
+            "London, UK",
+            "Madrid, Spain",
+            "Manchester, UK",
+            "Milan, Italy",
+            "Munich, Germany",
+            "Paris, France",
+            "Rome, Italy",
+            "Stockholm, Sweden",
+            "Vienna, Austria",
+            "Zurich, Switzerland",
+            "Bangalore, India",
+            "Chennai, India",
+            "Delhi, India",
+            "Gurgaon, India",
+            "Hyderabad, India",
+            "Mumbai, India",
+            "Pune, India",
+            "Singapore",
+            "Dubai, UAE",
+            "Abu Dhabi, UAE",
+            "Doha, Qatar",
+            "New York, USA",
+            "Boston, USA",
+            "Chicago, USA",
+            "San Francisco, USA",
+            "Seattle, USA",
+            "Toronto, Canada",
+            "Vancouver, Canada",
+            "Sydney, Australia",
+            "Melbourne, Australia",
+            "Auckland, New Zealand",
+            "Remote",
+            "Hybrid",
+        ]
+    gc = geonamescache.GeonamesCache()
+    countries = gc.get_countries()
+    raw_cities = gc.get_cities().values()
+    names = set()
+    for c in raw_cities:
+        code = c.get("countrycode")
+        country = countries.get(code, {}).get("name", "")
+        if country:
+            names.add(f"{c.get('name')}, {country}")
+        else:
+            names.add(c.get("name"))
+    names.update(["Remote", "Hybrid"])
+    return sorted(names)
+
+
+CITY_OPTIONS = get_city_options()
 
 st.set_page_config(
-    page_title="Setup - Job Hunt Assistant",
+    page_title="🛠 Setup - Job Hunt Assistant",
     page_icon="🎯",
     layout="centered",
 )
@@ -60,7 +85,8 @@ st.markdown(
 h1,h2,h3,p,label,.stMarkdown{color:white!important}
 .stButton>button{background:#e94560!important;color:white!important;border:none;border-radius:8px;width:100%;font-weight:bold}
 .card{background:#16213e;border:1px solid #0f3460;border-radius:12px;padding:20px;margin:10px 0}
-div[data-testid="stSidebarNav"] a[href*='app']{display:none!important}
+div[data-testid="stSidebarNav"] a{padding:8px 16px;margin:2px 8px;border-radius:8px;font-weight:500}
+div[data-testid="stSidebarNav"] a[aria-current="page"]{background:#1f2937!important;font-weight:600}
 div[data-testid="stSidebarNav"] a[href*='landing']{display:none!important}
 div[data-testid="stSidebarNav"] a[href*='login']{display:none!important}
 </style>""",
@@ -151,18 +177,28 @@ elif st.session_state.setup_step == 2:
         else:
             default_index = 0
         city_choice = st.selectbox(
-            "Current Location",
+            "Current Location (city)",
             city_options,
             index=default_index,
         )
-        custom_location = ""
+        custom_current_location = ""
         if city_choice == "Custom / Other":
-            custom_location = st.text_input(
-                "Enter location",
+            custom_current_location = st.text_input(
+                "Current location (free text)",
                 placeholder="City, Country",
                 value=existing_location if existing_location not in CITY_OPTIONS else "",
             )
-        location = custom_location or (city_choice if city_choice != "Custom / Other" else "")
+        location = (
+            custom_current_location
+            or (city_choice if city_choice != "Custom / Other" else "")
+        )
+        preferred_saved = existing_profile.get("preferred_locations", [])
+        preferred_locations = st.multiselect(
+            "Preferred Locations",
+            CITY_OPTIONS,
+            default=[p for p in preferred_saved if p in CITY_OPTIONS],
+            placeholder="Type to search and select multiple locations",
+        )
         relocate_default = "Yes" if existing_profile.get("relocate", True) else "No"
         relocate = st.selectbox(
             "Open to Relocate?",
@@ -368,6 +404,7 @@ elif st.session_state.setup_step == 2:
                     "target_roles": all_roles,
                     "target_markets": all_markets,
                     "industries": all_industries,
+                    "preferred_locations": preferred_locations,
                     "experience_markets": all_markets or ([location] if location else []),
                     "skills": [],
                 }
