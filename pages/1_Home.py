@@ -27,6 +27,9 @@ h1,h2,h3,p,label{color:white!important}
 .metric-value{font-size:2.5em;font-weight:bold;color:#e94560}
 .metric-label{font-size:0.9em;color:#aaa;margin-top:5px}
 .stButton>button{background:#e94560!important;color:white!important;border:none;border-radius:8px;font-weight:bold}
+div[data-testid="stSidebarNav"] a[href*='app']{display:none!important}
+div[data-testid="stSidebarNav"] a[href*='landing']{display:none!important}
+div[data-testid="stSidebarNav"] a[href*='login']{display:none!important}
 </style>""",
     unsafe_allow_html=True,
 )
@@ -81,23 +84,40 @@ st.markdown("---")
 st.subheader("🔍 Find Jobs")
 with st.expander("⚙️ Search Settings", expanded=True):
     c1, c2 = st.columns(2)
+    profile = st.session_state.get("user_profile", {})
     with c1:
-        role = st.text_input("Job Title", placeholder="Head of Talent Acquisition")
-        location = st.text_input("Location", placeholder="Spain, Europe, India")
-    with c2:
-        track = st.selectbox(
-            "Track",
-            ["Both", "A - India Based (EU-facing)", "B - Europe Direct"],
+        role = st.text_input(
+            "Job Title",
+            placeholder="Head of Talent Acquisition",
+            value=st.session_state.get("search_role", ""),
         )
+        default_location = st.session_state.get(
+            "search_location",
+            profile.get("location", "")
+            or (", ".join(profile.get("target_markets", [])) if profile.get("target_markets") else ""),
+        )
+        location = st.text_input(
+            "Location (city or market)",
+            placeholder="e.g. Hyderabad, Spain, Europe, Remote",
+            value=default_location,
+        )
+    with c2:
         seniority = st.multiselect(
             "Seniority",
             ["Director", "Head", "VP", "Senior Manager", "Associate Director", "Manager"],
             default=["Director", "Head", "VP", "Senior Manager", "Associate Director"],
         )
+        other_seniority = st.text_input(
+            "Other seniority levels (comma-separated, optional)",
+            key="other_seniority_levels",
+        )
 
+    extra_seniority = [
+        s.strip() for s in other_seniority.split(",") if s.strip()
+    ]
     st.session_state.search_role = role
     st.session_state.search_location = location
-    st.session_state.search_track = track
+    st.session_state.search_seniority = seniority + extra_seniority
 
 
 col1, col2 = st.columns(2)
@@ -109,7 +129,8 @@ with col1:
             serpapi_key = st.session_state.get("serpapi_key", "")
             groq_key = st.session_state.get("groq_key", "")
             profile = st.session_state.get("user_profile", {})
-            track_val = "A" if "A" in track else ("B" if "B" in track else "B")
+            loc_basis = (location or profile.get("location", "") or "").lower()
+            track_val = "A" if "india" in loc_basis else "B"
             jobs = search_jobs_serpapi(
                 role or "talent acquisition manager",
                 location or "Europe",

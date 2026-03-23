@@ -70,6 +70,19 @@ def build_email_subject(job, profile):
 
 
 def build_email_body(job, profile, cover_letter):
+    highlights = []
+    years = profile.get("years_experience")
+    if years:
+        highlights.append(f"{years}+ years of experience in relevant roles")
+    key_skills = profile.get("skills") or []
+    if key_skills:
+        highlights.append("Key skills: " + ", ".join(key_skills[:6]))
+    markets = profile.get("experience_markets") or []
+    if markets:
+        highlights.append("Market experience: " + ", ".join(markets))
+    highlight_text = "\n".join(f"- {h}" for h in highlights) if highlights else ""
+    linkedin = profile.get("linkedin")
+    linkedin_line = f"\nLinkedIn: {linkedin}" if linkedin else ""
     return f"""Dear Hiring Team,
 
 {cover_letter}
@@ -77,18 +90,14 @@ def build_email_body(job, profile, cover_letter):
 Please find attached my tailored CV and cover letter for the {job['title']} position at {job['company']}.
 
 Key highlights:
-- {profile.get('current_portfolio', '')}
-- 100% client retention across entire portfolio
-- 125% productivity improvement via AI-enabled processes
-- European, India, and Middle East market expertise
+{highlight_text}
 
-I am based in India and actively seeking relocation to Europe, with full flexibility on start date.
+I would welcome the opportunity to discuss how my experience fits this role.
 
 Best regards,
 {profile.get('name')}
 {profile.get('phone')}
-{profile.get('email')}
-LinkedIn: linkedin.com/in/danishhasan"""
+{profile.get('email')}{linkedin_line}"""
 
 
 if __name__ == "__main__":

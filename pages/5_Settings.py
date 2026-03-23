@@ -21,6 +21,9 @@ st.markdown(
 [data-testid="stHeader"]{background:#0f0f23!important}
 h1,h2,h3,p,label{color:white!important}
 .stButton>button{background:#e94560!important;color:white!important;border:none;border-radius:8px;font-weight:bold}
+div[data-testid="stSidebarNav"] a[href*='app']{display:none!important}
+div[data-testid="stSidebarNav"] a[href*='landing']{display:none!important}
+div[data-testid="stSidebarNav"] a[href*='login']{display:none!important}
 </style>""",
     unsafe_allow_html=True,
 )
@@ -73,7 +76,7 @@ with tab1:
         sc1, sc2 = st.columns([2, 1])
         with sc1:
             min_salary = st.text_input(
-                "Min Salary",
+                "Min Salary (Annual)",
                 value=str(
                     profile.get("min_salary", profile.get("min_salary_eur", ""))
                 ),
@@ -89,18 +92,51 @@ with tab1:
                 in ["EUR", "GBP", "USD", "INR", "AED", "CAD", "AUD", "SGD"]
                 else 0,
             )
+    suggested_roles = []
+    try:
+        from engines.gemini_engine import load_cv_notes
+
+        cv_notes = load_cv_notes()
+        for key in ["target_roles", "suggested_roles"]:
+            val = cv_notes.get(key, [])
+            if isinstance(val, str):
+                suggested_roles.append(val)
+            elif isinstance(val, list):
+                suggested_roles.extend(val)
+        strategy = cv_notes.get("job_search_strategy", {})
+        for key in ["roles", "titles", "role_titles"]:
+            val = strategy.get(key, [])
+            if isinstance(val, str):
+                suggested_roles.append(val)
+            elif isinstance(val, list):
+                suggested_roles.extend(val)
+    except Exception:
+        suggested_roles = []
+
+    base_roles = [
+        "Talent Acquisition Manager",
+        "Head of Talent",
+        "VP Talent",
+        "RPO Manager",
+        "Associate Director Recruitment",
+        "Recruitment Director",
+        "Senior TA Manager",
+    ]
+    role_options = []
+    for r in suggested_roles + base_roles:
+        if r and r not in role_options:
+            role_options.append(r)
+    existing_roles = profile.get("target_roles", [])
+    default_roles = existing_roles or suggested_roles
     target_roles = st.multiselect(
         "Target Roles",
-        [
-            "Talent Acquisition Manager",
-            "Head of Talent",
-            "VP Talent",
-            "RPO Manager",
-            "Associate Director Recruitment",
-            "Recruitment Director",
-            "Senior TA Manager",
-        ],
-        default=profile.get("target_roles", []),
+        role_options,
+        default=default_roles,
+    )
+    other_roles = st.text_input(
+        "Other roles (comma-separated, optional)",
+        value="",
+        key="settings_other_target_roles",
     )
     target_markets = st.multiselect(
         "Target Markets",
@@ -120,7 +156,8 @@ with tab1:
                 "min_salary": min_salary,
                 "salary_currency": salary_currency,
                 "min_salary_eur": min_salary,
-                "target_roles": target_roles,
+                "target_roles": target_roles
+                + [r.strip() for r in other_roles.split(",") if r.strip()],
                 "target_markets": target_markets,
             }
         )

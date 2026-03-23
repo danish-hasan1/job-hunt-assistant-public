@@ -12,10 +12,9 @@ def search_jobs_serpapi(role, location, track, serpapi_key, max_results=20):
         return get_test_jobs()
 
     jobs = []
-    queries = [
-        f"{role} {location}",
-        f"senior {role} {location}",
-    ]
+    # Build queries that emphasise the target location and nearby roles
+    base = f"{role} {location}".strip()
+    queries = [base, f"senior {role} {location}".strip(), f"{role} near {location}".strip()]
 
     for query in queries:
         try:
@@ -106,10 +105,14 @@ def score_jobs_with_groq(jobs, profile, groq_key):
 CANDIDATE:
 - Target roles: {profile.get('target_roles',[])}
 - Experience: {profile.get('years_experience',0)} years
-- Markets: {profile.get('experience_markets',[])}
+- Current location: {profile.get('location','')}
+- Target markets: {profile.get('target_markets',[])}
+- Markets experience: {profile.get('experience_markets',[])}
 - Relocate: {profile.get('relocate',True)}
+- Min annual salary: {profile.get('min_salary','')} {profile.get('salary_currency','')}
 
 JOB: {job['title']} at {job['company']} in {job['location']}
+SALARY (if given): {job.get('salary','Not disclosed')}
 DESCRIPTION: {job['description'][:500]}
 
 Return: {{"score": 0-100, "reason": "one sentence"}}"""
@@ -211,4 +214,3 @@ def get_test_jobs():
             "sponsorship": "possible",
         },
     ]
-

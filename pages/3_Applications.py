@@ -22,6 +22,9 @@ st.markdown(
 [data-testid="stHeader"]{background:#0f0f23!important}
 h1,h2,h3,p,label{color:white!important}
 .stButton>button{background:#e94560!important;color:white!important;border:none;border-radius:8px;font-weight:bold}
+div[data-testid="stSidebarNav"] a[href*='app']{display:none!important}
+div[data-testid="stSidebarNav"] a[href*='landing']{display:none!important}
+div[data-testid="stSidebarNav"] a[href*='login']{display:none!important}
 </style>""",
     unsafe_allow_html=True,
 )
@@ -88,9 +91,14 @@ for app in applications:
             st.markdown(f"**Location:** {app['location']}")
             st.markdown(f"**Score:** {app['score']}/100")
         with c2:
-            st.markdown(
-                f"**Track:** {'🇮🇳 India' if app.get('track')=='A' else '🇪🇺 Europe'}"
-            )
+            track_value = app.get("track")
+            if track_value == "A":
+                track_label = "🌍 Cross-border (Track A)"
+            elif track_value == "B":
+                track_label = "🏙 Local / Regional (Track B)"
+            else:
+                track_label = "Track not set"
+            st.markdown(f"**Track:** {track_label}")
             st.markdown(f"**Status:** {app['status'].upper()}")
         if app.get("cv_summary"):
             st.markdown(f"**CV Summary used:** {app['cv_summary'][:200]}...")

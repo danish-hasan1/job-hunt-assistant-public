@@ -18,6 +18,9 @@ st.markdown(
 [data-testid="stHeader"]{background:#0f0f23!important}
 h1,h2,h3,p,label{color:white!important}
 .stButton>button{background:#e94560!important;color:white!important;border:none;border-radius:8px;font-weight:bold}
+div[data-testid="stSidebarNav"] a[href*='app']{display:none!important}
+div[data-testid="stSidebarNav"] a[href*='landing']{display:none!important}
+div[data-testid="stSidebarNav"] a[href*='login']{display:none!important}
 </style>""",
     unsafe_allow_html=True,
 )
@@ -44,7 +47,10 @@ if not jobs:
 
 c1, c2, c3 = st.columns(3)
 with c1:
-    track_filter = st.selectbox("Track", ["All", "A - India Based", "B - Europe Direct"])
+    track_filter = st.selectbox(
+        "Track",
+        ["All", "Track A (Cross-border)", "Track B (Local/Regional)"],
+    )
 with c2:
     status_filter = st.selectbox("Status", ["All", "new", "approved", "rejected"])
 with c3:
@@ -53,7 +59,7 @@ with c3:
 
 filtered = jobs
 if track_filter != "All":
-    tv = "A" if "A" in track_filter else "B"
+    tv = "A" if "Track A" in track_filter else "B"
     filtered = [j for j in filtered if j.get("track") == tv]
 if status_filter != "All":
     filtered = [j for j in filtered if j.get("status") == status_filter]
@@ -78,9 +84,14 @@ for job in filtered:
             st.markdown(f"**Company:** {job['company']}")
             st.markdown(f"**Location:** {job['location']}")
         with c2:
-            st.markdown(
-                f"**Track:** {'🇮🇳 India-Based' if job.get('track')=='A' else '🇪🇺 Europe Direct'}"
-            )
+            track_value = job.get("track")
+            if track_value == "A":
+                track_label = "🌍 Cross-border (Track A)"
+            elif track_value == "B":
+                track_label = "🏙 Local / Regional (Track B)"
+            else:
+                track_label = "Track not set"
+            st.markdown(f"**Track:** {track_label}")
             st.markdown(f"**Source:** {job.get('source','LinkedIn')}")
         with c3:
             st.markdown(f"**Score:** {score}/100")

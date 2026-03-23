@@ -16,6 +16,9 @@ st.markdown(
 h1,h2,h3,p,label,.stMarkdown{color:white!important}
 .stButton>button{background:#e94560!important;color:white!important;border:none;border-radius:8px;width:100%;font-weight:bold}
 .card{background:#16213e;border:1px solid #0f3460;border-radius:12px;padding:20px;margin:10px 0}
+div[data-testid="stSidebarNav"] a[href*='app']{display:none!important}
+div[data-testid="stSidebarNav"] a[href*='landing']{display:none!important}
+div[data-testid="stSidebarNav"] a[href*='login']{display:none!important}
 </style>""",
     unsafe_allow_html=True,
 )
@@ -93,24 +96,56 @@ elif st.session_state.setup_step == 2:
         )
         sc1, sc2 = st.columns([2, 1])
         with sc1:
-            min_salary = st.text_input("Min Salary", placeholder="60000")
+            min_salary = st.text_input(
+                "Min Salary (Annual)", placeholder="60000 (annual)"
+            )
         with sc2:
             salary_currency = st.selectbox(
                 "Currency",
                 ["EUR", "GBP", "USD", "INR", "AED", "CAD", "AUD", "SGD"],
             )
+    suggested_roles = []
+    try:
+        from engines.gemini_engine import load_cv_notes
+
+        cv_notes = load_cv_notes()
+        for key in ["target_roles", "suggested_roles"]:
+            val = cv_notes.get(key, [])
+            if isinstance(val, str):
+                suggested_roles.append(val)
+            elif isinstance(val, list):
+                suggested_roles.extend(val)
+        strategy = cv_notes.get("job_search_strategy", {})
+        for key in ["roles", "titles", "role_titles"]:
+            val = strategy.get(key, [])
+            if isinstance(val, str):
+                suggested_roles.append(val)
+            elif isinstance(val, list):
+                suggested_roles.extend(val)
+    except Exception:
+        suggested_roles = []
+
+    base_roles = [
+        "Talent Acquisition Manager",
+        "Head of Talent",
+        "VP Talent",
+        "RPO Manager",
+        "Associate Director Recruitment",
+        "Recruitment Director",
+        "Senior TA Manager",
+    ]
+    role_options = []
+    for r in suggested_roles + base_roles:
+        if r and r not in role_options:
+            role_options.append(r)
+    default_roles = suggested_roles or ["Head of Talent", "RPO Manager"]
     target_roles = st.multiselect(
         "Target Roles *",
-        [
-            "Talent Acquisition Manager",
-            "Head of Talent",
-            "VP Talent",
-            "RPO Manager",
-            "Associate Director Recruitment",
-            "Recruitment Director",
-            "Senior TA Manager",
-        ],
-        default=["Head of Talent", "RPO Manager"],
+        role_options,
+        default=default_roles,
+    )
+    other_roles = st.text_input(
+        "Other roles (comma-separated, optional)", key="other_target_roles"
     )
     target_markets = st.multiselect(
         "Target Markets *",
@@ -134,7 +169,11 @@ elif st.session_state.setup_step == 2:
                 missing.append("Full Name")
             if not email.strip():
                 missing.append("Email")
-            if not target_roles:
+            extra_roles = [
+                r.strip() for r in other_roles.split(",") if r.strip()
+            ]
+            all_roles = target_roles + extra_roles
+            if not all_roles:
                 missing.append("Target Roles")
             if not target_markets:
                 missing.append("Target Markets")
@@ -150,18 +189,11 @@ elif st.session_state.setup_step == 2:
                     "salary_currency": salary_currency,
                     "min_salary_eur": min_salary,
                     "years_experience": experience,
-                    "target_roles": target_roles,
+                    "target_roles": all_roles,
                     "target_markets": target_markets,
                     "industries": industries,
-                    "experience_markets": ["Europe", "India", "Middle East"],
-                    "skills": [
-                        "Talent Acquisition",
-                        "RPO Delivery",
-                        "Stakeholder Management",
-                        "Boolean Search",
-                        "Team Leadership",
-                        "ATS Management",
-                    ],
+                    "experience_markets": target_markets or ([location] if location else []),
+                    "skills": [],
                 }
                 st.session_state.setup_step = 3
                 st.rerun()

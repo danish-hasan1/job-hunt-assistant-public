@@ -80,7 +80,7 @@ with tab2:
     reg_pass2 = st.text_input("Confirm Password", type="password", key="reg_pass2")
     ref_code = st.text_input(
         "Referral code (optional)",
-        placeholder="YOURCODE1234",
+        placeholder="DANISH1234",
         key="ref_code",
     )
     if st.button("📝 Create Account", key="reg_btn"):
@@ -202,3 +202,4 @@ with tab3:
         if st.button("← Back", key="reset_back"):
             st.session_state.reset_stage = "email"
             st.rerun()
+

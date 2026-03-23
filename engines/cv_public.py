@@ -75,13 +75,18 @@ def tailor_cv_summary(cv_summary, job, profile, groq_key):
 
 def generate_cover_letter(job, profile, groq_key):
     if not groq_key or groq_key == "test_mode":
+        years = profile.get("years_experience", 5)
+        markets = profile.get("experience_markets", [])
+        markets_text = ", ".join(markets) if markets else "different markets and environments"
+        skills = profile.get("skills") or []
+        skills_text = ", ".join(skills[:6]) if skills else "relevant roles"
         return f"""Dear Hiring Team, 
 
- Having followed {job['company']}'s work closely, I am excited to apply for the {job['title']} position. Your organisation's approach to talent acquisition aligns perfectly with my professional values and expertise. 
+ I am excited to apply for the {job['title']} position at {job['company']}. Based on the role description, I believe my background and experience are a strong match for your requirements. 
  
- With {profile.get('years_experience',10)}+ years leading recruitment functions across European, Indian, and Middle Eastern markets, I bring a proven track record in RPO delivery and strategic talent acquisition. I have consistently delivered results including 100% client retention and significant productivity improvements through AI-enabled processes. 
+ With {years}+ years of experience across {markets_text}, I have developed deep expertise in {skills_text} and a track record of delivering measurable results. I am confident that this experience will allow me to contribute quickly and effectively in this role. 
  
- I am fully committed to this opportunity and available to discuss my application at your earliest convenience. I look forward to contributing to {job['company']}'s continued success. 
+ I am highly motivated by the opportunity to join {job['company']} and would welcome the chance to discuss my application further. 
  
  Best regards, 
  {profile.get('name','')} 
@@ -159,4 +164,3 @@ def create_tailored_cv_bytes(cv_bytes, tailored_summary, job):
 
 if __name__ == "__main__":
     print("CV public engine ready ✓")
-
