@@ -255,6 +255,19 @@ elif st.session_state.setup_step == 2:
     except Exception:
         suggested_roles = []
 
+    try:
+        cv_bytes_state = st.session_state.get("cv_bytes")
+        if cv_bytes_state:
+            from engines.cv_public import infer_target_roles_from_cv
+
+            groq_key = st.session_state.get("groq_key", "")
+            inferred_roles = infer_target_roles_from_cv(cv_bytes_state, groq_key)
+            for r in inferred_roles:
+                if r and r not in suggested_roles:
+                    suggested_roles.append(r)
+    except Exception:
+        pass
+
     base_roles = [
         "Product Manager",
         "Project Manager",

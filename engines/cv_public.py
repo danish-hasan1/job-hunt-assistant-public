@@ -1,5 +1,6 @@
 import io
 import os
+import json
 from docx import Document
 from docx.shared import Pt
 from datetime import date
@@ -29,7 +30,7 @@ def extract_cv_summary(cv_bytes):
             if len(summary_lines) >= 4:
                 break
         return " ".join(summary_lines)
-    except Exception as e:
+    except Exception:
         return ""
 
 
@@ -158,8 +159,98 @@ def create_tailored_cv_bytes(cv_bytes, tailored_summary, job):
         doc.save(output)
         output.seek(0)
         return output.getvalue()
-    except Exception as e:
+    except Exception:
         return cv_bytes
+
+
+def infer_target_roles_from_cv(cv_bytes, groq_key=None):
+    summary = extract_cv_summary(cv_bytes)
+    text = summary
+    if not text:
+        try:
+            doc = Document(io.BytesIO(cv_bytes))
+            lines = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+            text = " ".join(lines[:40])
+        except Exception:
+            text = ""
+    if not text:
+        return []
+    roles = []
+    if groq_key and groq_key != "test_mode":
+        try:
+            from groq import Groq
+
+            client = Groq(api_key=groq_key)
+            prompt = f"""From this CV text, list 3-5 realistic target job titles for this candidate.
+Return ONLY a valid JSON list of strings, no extra text.
+
+CV:
+{text[:2000]}"""
+            r = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+            )
+            out = r.choices[0].message.content.strip()
+            if "```" in out:
+                out = out.split("```")[1]
+                if out.startswith("json"):
+                    out = out[4:]
+            data = json.loads(out.strip())
+            roles = [str(x).strip() for x in data if str(x).strip()]
+        except Exception:
+            roles = []
+    if roles:
+        return roles
+    keywords = [
+        "Head",
+        "Director",
+        "Manager",
+        "Lead",
+        "Leader",
+        "VP",
+        "Vice President",
+        "Chief",
+        "Owner",
+    ]
+    candidates = []
+    parts = text.replace("|", ",").split(",")
+    for part in parts:
+        s = part.strip()
+        if not s:
+            continue
+        if any(
+            k.lower() in s.lower()
+            for k in [
+                "recruitment",
+                "talent",
+                "acquisition",
+                "people",
+                "hr",
+                "human resources",
+                "operations",
+                "delivery",
+                "staffing",
+            ]
+        ):
+            if any(k in s for k in keywords) or "manager" in s.lower() or "director" in s.lower():
+                candidates.append(s)
+    if not candidates:
+        for line in text.split("."):
+            s = line.strip()
+            if not s:
+                continue
+            if any(k in s for k in keywords) and len(s) <= 80:
+                candidates.append(s)
+    seen = set()
+    roles = []
+    for c in candidates:
+        if c not in seen:
+            seen.add(c)
+            roles.append(c)
+        if len(roles) >= 5:
+            break
+    return roles
 
 
 if __name__ == "__main__":

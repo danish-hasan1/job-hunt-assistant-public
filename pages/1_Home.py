@@ -201,11 +201,12 @@ with col1:
             serpapi_key = st.session_state.get("serpapi_key", "")
             groq_key = st.session_state.get("groq_key", "")
             profile = st.session_state.get("user_profile", {})
-            loc_basis = (location or profile.get("location", "") or "").lower()
+            search_location = ", ".join(locations) if locations else ""
+            loc_basis = (search_location or profile.get("location", "") or "").lower()
             track_val = "A" if "india" in loc_basis else "B"
             jobs = search_jobs_serpapi(
                 role or "talent acquisition manager",
-                location or "Europe",
+                search_location or "Europe",
                 track_val,
                 serpapi_key,
             )
