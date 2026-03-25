@@ -69,7 +69,10 @@ if not jobs:
     st.stop()
 
 
-c1, c2, c3 = st.columns(3)
+focus_job_id = st.session_state.pop("focus_job_id", None)
+
+
+c1, c2, c3, c4 = st.columns(4)
 with c1:
     track_filter = st.selectbox(
         "Track",
@@ -79,6 +82,15 @@ with c2:
     status_filter = st.selectbox("Status", ["All", "new", "approved", "rejected"])
 with c3:
     min_score = st.slider("Min Score", 0, 100, 0)
+with c4:
+    source_options = ["All", "LinkedIn (any)", "LinkedIn Direct", "Other boards"]
+    source_filter = st.selectbox("Source", source_options)
+
+t1, t2 = st.columns(2)
+with t1:
+    hide_junior = st.checkbox("Hide junior / entry roles", value=False)
+with t2:
+    remote_only = st.checkbox("Remote-friendly only", value=False)
 
 
 filtered = jobs
@@ -89,6 +101,64 @@ if status_filter != "All":
     filtered = [j for j in filtered if j.get("status") == status_filter]
 if min_score > 0:
     filtered = [j for j in filtered if j.get("score", 0) >= min_score]
+if source_filter != "All":
+    if source_filter == "LinkedIn (any)":
+        filtered = [
+            j
+            for j in filtered
+            if "linkedin" in str(j.get("source", "")).lower()
+        ]
+    elif source_filter == "LinkedIn Direct":
+        filtered = [j for j in filtered if j.get("source") == "LinkedIn Direct"]
+    else:
+        filtered = [
+            j
+            for j in filtered
+            if "linkedin" not in str(j.get("source", "")).lower()
+        ]
+if hide_junior:
+    junior_keys = [
+        "junior",
+        "entry level",
+        "intern",
+        "trainee",
+        "graduate",
+        "coordinator",
+        "assistant",
+        "sourcer",
+    ]
+    filtered = [
+        j
+        for j in filtered
+        if not any(k in str(j.get("title", "")).lower() for k in junior_keys)
+    ]
+if remote_only:
+    remote_keys = ["remote", "work from home", "home-based"]
+    filtered = [
+        j
+        for j in filtered
+        if any(
+            k in str(j.get("location", "")).lower()
+            or k in str(j.get("description", "")).lower()
+            for k in remote_keys
+        )
+    ]
+
+sort_options = ["Default order", "Score: high to low", "Cross-border first", "Local/Regional first"]
+sort_choice = st.selectbox("Sort by", sort_options, index=0)
+
+if sort_choice == "Score: high to low":
+    filtered = sorted(filtered, key=lambda j: j.get("score", 0), reverse=True)
+elif sort_choice == "Cross-border first":
+    filtered = sorted(
+        filtered,
+        key=lambda j: 0 if j.get("track") == "A" else 1,
+    )
+elif sort_choice == "Local/Regional first":
+    filtered = sorted(
+        filtered,
+        key=lambda j: 0 if j.get("track") == "B" else 1,
+    )
 
 
 st.caption(f"Showing {len(filtered)} of {len(jobs)} jobs")
@@ -100,8 +170,10 @@ for job in filtered:
     status_emoji = {"new": "🔵", "approved": "🟢", "rejected": "🔴", "applied": "✅"}.get(
         status, "🔵"
     )
+    expanded_default = focus_job_id is not None and job.get("id") == focus_job_id
     with st.expander(
-        f"{status_emoji} {job['title']} | {job['company']} | {job['location']} | Score: {score}"
+        f"{status_emoji} {job['title']} | {job['company']} | {job['location']} | Score: {score}",
+        expanded=expanded_default,
     ):
         c1, c2, c3 = st.columns(3)
         with c1:
@@ -186,6 +258,43 @@ for job in filtered:
                             pass
                         st.success("✅ CV tailored!")
         with cd:
+            st.markdown("**🗂 Job notes & priority**")
+            existing_notes = job.get("notes", "")
+            existing_priority = job.get("priority", "Medium")
+            notes_val = st.text_area(
+                "Notes (only visible to you)",
+                value=existing_notes,
+                key=f"notes_{job['id']}",
+                height=80,
+            )
+            priority_val = st.selectbox(
+                "Priority",
+                ["Low", "Medium", "High"],
+                index=["Low", "Medium", "High"].index(
+                    existing_priority if existing_priority in ["Low", "Medium", "High"] else "Medium"
+                ),
+                key=f"priority_{job['id']}",
+            )
+            if st.button("💾 Save notes", key=f"save_notes_{job['id']}"):
+                job["notes"] = notes_val
+                job["priority"] = priority_val
+                jobs_list = st.session_state.get("jobs", [])
+                for j in jobs_list:
+                    if j.get("id") == job.get("id"):
+                        j["notes"] = notes_val
+                        j["priority"] = priority_val
+                        break
+                st.session_state.jobs = jobs_list
+                try:
+                    from engines.auth import save_user_data
+
+                    email = st.session_state.get("user_email", "")
+                    if email:
+                        save_user_data(email, "jobs", st.session_state.jobs)
+                except Exception:
+                    pass
+                st.success("Notes saved")
+
             if st.button("📋 Mark Applied", key=f"done_{job['id']}"):
                 job["status"] = "applied"
                 if "applications" not in st.session_state:
@@ -203,6 +312,8 @@ for job in filtered:
                         "cv_summary": st.session_state.get(
                             f"cv_summary_{job['id']}", ""
                         ),
+                        "notes": job.get("notes", ""),
+                        "priority": job.get("priority", "Medium"),
                     }
                 )
                 try:
@@ -370,14 +481,18 @@ for job in filtered:
         st.markdown("**🤝 LinkedIn Outreach**")
         from engines.outreach_agent import (
             find_company_contact,
+            find_hiring_managers,
             generate_outreach_message,
             launch_outreach_request,
+            save_outreach,
         )
 
         profile = st.session_state.get("user_profile", {})
         groq_key = st.session_state.get("groq_key", "")
         contacts_key = f"outreach_contacts_{job['id']}"
         msgs_key_prefix = f"outreach_msg_{job['id']}_"
+        hm_contacts_key = f"outreach_hm_contacts_{job['id']}"
+        hm_msgs_prefix = f"outreach_hm_msg_{job['id']}_"
 
         if st.button("🔍 Find People at Company", key=f"find_contacts_{job['id']}"):
             with st.spinner(f"Searching LinkedIn for people at {job['company']}..."):
@@ -386,6 +501,7 @@ for job in filtered:
 
         contacts = st.session_state.get(contacts_key, [])
         if contacts:
+            st.markdown("**People at this company**")
             for idx, c in enumerate(contacts):
                 st.markdown(f"**{c['name']}** — {c['role']}")
                 st.caption(c["url"])
@@ -427,7 +543,98 @@ for job in filtered:
                         "🚀 Open LinkedIn & Prefill",
                         key=f"send_req_{job['id']}_{idx}",
                     ):
+                        try:
+                            save_outreach(
+                                job.get("id"),
+                                c.get("company"),
+                                c.get("name"),
+                                c.get("role"),
+                                c.get("url"),
+                                message_val,
+                            )
+                        except Exception:
+                            pass
                         ok, info = launch_outreach_request(c["url"], message_val)
+                        if ok:
+                            st.info(info)
+                        else:
+                            st.error(info)
+
+        if st.button(
+            "🎯 Find 10 Hiring Managers (role-aligned)",
+            key=f"find_hm_{job['id']}",
+        ):
+            with st.spinner(
+                f"Searching LinkedIn for hiring managers at {job['company']}..."
+            ):
+                target_roles = profile.get("target_roles", [])
+                role_hint = ", ".join(target_roles[:3]) if target_roles else job["title"]
+                hm_contacts, hm_errors = find_hiring_managers(
+                    job["company"], role_hint, max_results=10
+                )
+                st.session_state[hm_contacts_key] = hm_contacts
+                if hm_errors:
+                    st.session_state[f"hm_errors_{job['id']}"] = hm_errors
+
+        hm_contacts = st.session_state.get(hm_contacts_key, [])
+        if hm_contacts:
+            st.markdown("**Hiring managers relevant to your roles**")
+            for idx, c in enumerate(hm_contacts):
+                st.markdown(f"**{c['contact_name']}** — {c['contact_role']}")
+                st.caption(c["linkedin_url"])
+                msg_key = f"{hm_msgs_prefix}{idx}"
+                if st.button(
+                    "✉ Generate Message",
+                    key=f"gen_hm_msg_{job['id']}_{idx}",
+                ):
+                    message = ""
+                    if groq_key and groq_key != "test_mode":
+                        try:
+                            from groq import Groq
+
+                            client = Groq(api_key=groq_key)
+                            message = generate_outreach_message(
+                                c["contact_name"],
+                                c["company"],
+                                job["title"],
+                                profile,
+                                client,
+                            )
+                        except Exception:
+                            message = ""
+                    if not message:
+                        first_name = c["contact_name"].split()[0]
+                        message = (
+                            f"Hi {first_name}, I’ve been following {c['company']} and your work there. "
+                            f"My background in {', '.join(profile.get('target_roles', [])) or 'talent acquisition'} "
+                            f"seems aligned with leadership roles in your team. "
+                            "Would you be open to connecting for a brief exchange on how your function is set up?"
+                        )
+                    st.session_state[msg_key] = message
+                message_val = st.session_state.get(msg_key, "")
+                if message_val:
+                    st.text_area(
+                        "Connection message",
+                        message_val,
+                        height=120,
+                        key=f"hm_msg_area_{job['id']}_{idx}",
+                    )
+                    if st.button(
+                        "🚀 Open LinkedIn & Prefill",
+                        key=f"send_hm_req_{job['id']}_{idx}",
+                    ):
+                        try:
+                            save_outreach(
+                                job.get("id"),
+                                c.get("company"),
+                                c.get("contact_name"),
+                                c.get("contact_role"),
+                                c.get("linkedin_url"),
+                                message_val,
+                            )
+                        except Exception:
+                            pass
+                        ok, info = launch_outreach_request(c["linkedin_url"], message_val)
                         if ok:
                             st.info(info)
                         else:

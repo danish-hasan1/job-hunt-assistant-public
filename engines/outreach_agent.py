@@ -2,11 +2,21 @@ import os
 import time as _time
 import json as _json
 from datetime import date
-from playwright.sync_api import sync_playwright
 import sys
+
+try:
+    from playwright.sync_api import sync_playwright
+
+    PLAYWRIGHT_AVAILABLE = True
+except Exception:
+    sync_playwright = None
+    PLAYWRIGHT_AVAILABLE = False
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def get_browser_with_session(p):
+    if not PLAYWRIGHT_AVAILABLE:
+        raise RuntimeError("Playwright not available")
     browser = p.webkit.launch(headless=False, slow_mo=200)
     context = browser.new_context()
     try:
@@ -19,16 +29,46 @@ def get_browser_with_session(p):
     return browser, context, page
 
 
+def connect_linkedin_for_cookies(wait_seconds: int = 90):
+    if not PLAYWRIGHT_AVAILABLE:
+        return False, "Playwright is not installed. Install it to enable LinkedIn session connect."
+    with sync_playwright() as p:
+        browser = p.webkit.launch(headless=False, slow_mo=300)
+        context = browser.new_context()
+        page = context.new_page()
+        try:
+            page.goto("https://www.linkedin.com/login", timeout=30000)
+            print(
+                f"Please log in to LinkedIn in the opened window. Waiting up to {wait_seconds} seconds..."
+            )
+            _time.sleep(wait_seconds)
+            cookies = context.cookies()
+            with open("linkedin_cookies.json", "w") as f:
+                _json.dump(cookies, f)
+            print(f"Saved {len(cookies)} cookies to linkedin_cookies.json")
+            browser.close()
+            return True, "LinkedIn connected and cookies saved for automation."
+        except Exception as e:
+            try:
+                browser.close()
+            except Exception:
+                pass
+            return False, f"Error while connecting to LinkedIn: {str(e)}"
+
+
 def find_hiring_managers(company_name, role_hint="talent acquisition", max_results=3):
+    if not PLAYWRIGHT_AVAILABLE:
+        return [], ["Playwright not available. Install it to enable automatic LinkedIn hiring-manager search."]
     contacts = []
     errors = []
     if not company_name:
         return contacts, errors
 
+    base_role = (role_hint or "hiring manager").strip()
     queries = [
-        f"{company_name} head talent acquisition",
-        f"{company_name} talent acquisition director manager",
-        f"{company_name} HR director recruitment lead",
+        f"{company_name} {base_role}",
+        f"{company_name} {base_role} director manager",
+        f"{company_name} head {base_role}",
     ]
 
     RELEVANT_TITLES = [
@@ -121,6 +161,8 @@ def find_hiring_managers(company_name, role_hint="talent acquisition", max_resul
     return contacts, errors
 
 def find_company_contact(company_name):
+    if not PLAYWRIGHT_AVAILABLE:
+        return []
     contacts = []
     query = f"\"{company_name}\" talent acquisition recruitment HR"
     
@@ -199,6 +241,8 @@ Rules:
         return f"Hi {contact_name.split()[0]}, I've been following {company_name} and would love to connect. How has your experience been there?"
 
 def send_connection_request(profile_url, message):
+    if not PLAYWRIGHT_AVAILABLE:
+        return False, "Playwright not available. Open the LinkedIn profile URL in your browser and send the request manually."
     with sync_playwright() as p:
         browser, context, page = get_browser_with_session(p)
         try:

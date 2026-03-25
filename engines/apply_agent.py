@@ -1,7 +1,14 @@
 import os, time, subprocess
 from datetime import date
-from playwright.sync_api import sync_playwright
 import json as _json
+
+try:
+    from playwright.sync_api import sync_playwright
+
+    PLAYWRIGHT_AVAILABLE = True
+except Exception:
+    sync_playwright = None
+    PLAYWRIGHT_AVAILABLE = False
 
 
 def get_browser_with_session(p):
@@ -18,6 +25,8 @@ def get_browser_with_session(p):
 
 
 def find_linkedin_job_url(job):
+    if not PLAYWRIGHT_AVAILABLE:
+        return None
     title = job.get("title", "") or ""
     company = job.get("company", "") or ""
     location = job.get("location", "") or ""
@@ -59,6 +68,17 @@ def find_linkedin_job_url(job):
 
 
 def apply_linkedin_semi_auto(job, cv_path, profile):
+    if not PLAYWRIGHT_AVAILABLE:
+        job_url = job.get("url", "")
+        if job_url:
+            try:
+                import webbrowser
+
+                webbrowser.open(job_url)
+                return False, "Playwright not available. Opened LinkedIn job in your browser."
+            except Exception:
+                pass
+        return False, "Playwright not available. Open the LinkedIn job manually using the View Job link."
     job_url = job.get("url", "")
     if not job_url:
         return False, "No job URL found"
@@ -158,6 +178,17 @@ def apply_linkedin_semi_auto(job, cv_path, profile):
 
 
 def apply_linkedin_one_click(job, cv_path, profile):
+    if not PLAYWRIGHT_AVAILABLE:
+        job_url = job.get("url", "")
+        if job_url:
+            try:
+                import webbrowser
+
+                webbrowser.open(job_url)
+                return False, "LinkedIn automation requires Playwright. Opened the job in your browser instead."
+            except Exception:
+                pass
+        return False, "LinkedIn automation requires Playwright. Please open the job using the View Job link."
     job_url = job.get("url", "") or ""
     if not job_url:
         found = find_linkedin_job_url(job)

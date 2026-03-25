@@ -280,6 +280,32 @@ with tab2:
         except Exception:
             st.success("✅ API keys updated for this session")
 
+    st.markdown("---")
+    st.subheader("LinkedIn automation engine")
+    try:
+        from engines.apply_agent import PLAYWRIGHT_AVAILABLE as APPLY_PLAYWRIGHT
+    except Exception:
+        APPLY_PLAYWRIGHT = False
+    try:
+        from engines.outreach_agent import PLAYWRIGHT_AVAILABLE as OUTREACH_PLAYWRIGHT
+    except Exception:
+        OUTREACH_PLAYWRIGHT = False
+    has_playwright = APPLY_PLAYWRIGHT and OUTREACH_PLAYWRIGHT
+    if has_playwright:
+        st.success(
+            "Playwright detected. 1‑click LinkedIn Apply and outreach automation are fully enabled on this machine."
+        )
+    else:
+        st.warning(
+            "Playwright is not installed or not available. LinkedIn automation will fall back to opening jobs and profiles in your browser."
+        )
+        st.markdown(
+            "To enable full automation on your own machine, install Playwright:\n"
+            "- In a terminal, run: `pip install playwright`\n"
+            "- Then run: `playwright install` to download the browser engines\n"
+            "- Restart this app after installation"
+        )
+
 
 with tab3:
     st.subheader("Reset")

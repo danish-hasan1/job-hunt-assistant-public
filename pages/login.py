@@ -21,6 +21,25 @@ st.title("🎯 Job Hunt Assistant")
 st.caption("AI-powered job search — free forever")
 st.markdown("---")
 
+if "legal_accept" not in st.session_state:
+    st.session_state.legal_accept = False
+
+st.markdown("**Disclaimer & Consent**")
+st.caption(
+    "Job Hunt Assistant suggests jobs, generates content and can automate actions on external sites like LinkedIn and email. "
+    "You remain fully responsible for all applications, messages and account activity. "
+    "By continuing, you confirm that you will review all content before sending, comply with all platform and employer terms, "
+    "and accept that we are not liable for any outcomes arising from your use of this tool."
+)
+consent_checked = st.checkbox(
+    "I have read and agree to this disclaimer.",
+    value=st.session_state.legal_accept,
+    key="legal_consent_checkbox",
+)
+if consent_checked:
+    st.session_state.legal_accept = True
+
+
 
 tab1, tab2, tab3 = st.tabs(["🔐 Login", "📝 Register", "🔑 Forgot Password"])
 
@@ -30,7 +49,9 @@ with tab1:
     email = st.text_input("Email", placeholder="you@gmail.com", key="login_email")
     password = st.text_input("Password", type="password", key="login_pass")
     if st.button("🚀 Login", key="login_btn"):
-        if email and password:
+        if not st.session_state.get("legal_accept"):
+            st.warning("Please read and agree to the disclaimer above before logging in.")
+        elif email and password:
             from engines.auth import login_user
 
             ok, user, msg = login_user(email, password)
@@ -80,52 +101,139 @@ with tab1:
 with tab2:
     st.subheader("Create your account")
     st.caption("Takes 2 minutes — completely free")
-    reg_name = st.text_input("Full Name", placeholder="Your Name", key="reg_name")
-    reg_email = st.text_input("Email", placeholder="you@gmail.com", key="reg_email")
-    reg_pass = st.text_input("Password", type="password", key="reg_pass")
-    reg_pass2 = st.text_input("Confirm Password", type="password", key="reg_pass2")
-    ref_code = st.text_input(
-        "Referral code (optional)",
-        placeholder="YOURCODE1234",
-        key="ref_code",
+    method = st.radio(
+        "Sign-up method",
+        ["Email + password", "LinkedIn profile"],
+        index=0,
+        horizontal=True,
+        key="signup_method",
     )
-    if st.button("📝 Create Account", key="reg_btn"):
-        if reg_name and reg_email and reg_pass:
-            if reg_pass != reg_pass2:
-                st.error("Passwords don't match")
+
+    if method == "Email + password":
+        reg_name = st.text_input("Full Name", placeholder="Your Name", key="reg_name")
+        reg_email = st.text_input("Email", placeholder="you@gmail.com", key="reg_email")
+        reg_pass = st.text_input("Password", type="password", key="reg_pass")
+        reg_pass2 = st.text_input("Confirm Password", type="password", key="reg_pass2")
+        ref_code = st.text_input(
+            "Referral code (optional)",
+            placeholder="YOURCODE1234",
+            key="ref_code",
+        )
+        if st.button("📝 Create Account", key="reg_btn"):
+            if not st.session_state.get("legal_accept"):
+                st.warning("Please read and agree to the disclaimer above before creating an account.")
+            elif reg_name and reg_email and reg_pass:
+                if reg_pass != reg_pass2:
+                    st.error("Passwords don't match")
+                else:
+                    from engines.auth import register_user
+
+                    ok, msg = register_user(
+                        reg_email,
+                        reg_pass,
+                        {
+                            "name": reg_name,
+                            "email": reg_email,
+                            "location": "",
+                            "target_roles": [],
+                            "target_markets": [],
+                            "years_experience": 0,
+                        },
+                    )
+                    if ok:
+                        if ref_code:
+                            from engines.referral import apply_referral_code
+
+                            apply_referral_code(reg_email, ref_code)
+                        st.session_state.logged_in = True
+                        st.session_state.user_email = reg_email
+                        st.session_state.user_profile = {
+                            "name": reg_name,
+                            "email": reg_email,
+                        }
+                        st.session_state.setup_complete = False
+                        st.success("Account created! Let's set up your profile.")
+                        st.switch_page("pages/0_Setup.py")
+                    else:
+                        st.error(msg)
             else:
+                st.warning("Please fill all fields")
+    else:
+        st.subheader("Register using your LinkedIn profile")
+        st.caption(
+            "Skip choosing a password — we will link your account to your LinkedIn profile URL."
+        )
+        li_name = st.text_input(
+            "Full Name (from LinkedIn)",
+            placeholder="Your Name",
+            key="li_name",
+        )
+        li_email = st.text_input(
+            "Email for this app",
+            placeholder="you@gmail.com",
+            key="li_email",
+        )
+        li_profile = st.text_input(
+            "LinkedIn Profile URL",
+            placeholder="https://www.linkedin.com/in/your-profile",
+            key="li_profile",
+        )
+        if st.button("🔗 Register with LinkedIn", key="li_reg_btn"):
+            if not st.session_state.get("legal_accept"):
+                st.warning("Please read and agree to the disclaimer above before creating an account.")
+            elif li_name and li_email and li_profile:
                 from engines.auth import register_user
 
                 ok, msg = register_user(
-                    reg_email,
-                    reg_pass,
+                    li_email,
+                    "linkedin_auth",
                     {
-                        "name": reg_name,
-                        "email": reg_email,
+                        "name": li_name,
+                        "email": li_email,
                         "location": "",
                         "target_roles": [],
                         "target_markets": [],
                         "years_experience": 0,
+                        "linkedin_profile": li_profile,
                     },
                 )
                 if ok:
-                    if ref_code:
-                        from engines.referral import apply_referral_code
-
-                        apply_referral_code(reg_email, ref_code)
                     st.session_state.logged_in = True
-                    st.session_state.user_email = reg_email
+                    st.session_state.user_email = li_email
                     st.session_state.user_profile = {
-                        "name": reg_name,
-                        "email": reg_email,
+                        "name": li_name,
+                        "email": li_email,
+                        "linkedin_profile": li_profile,
                     }
                     st.session_state.setup_complete = False
-                    st.success("Account created! Let's set up your profile.")
+                    st.success(
+                        "Account created via LinkedIn! Let's set up your profile."
+                    )
                     st.switch_page("pages/0_Setup.py")
                 else:
                     st.error(msg)
-        else:
-            st.warning("Please fill all fields")
+            else:
+                st.warning("Please fill name, email, and LinkedIn profile URL")
+
+        st.markdown("---")
+        st.caption(
+            "Optional: connect your LinkedIn session now so 1‑click Apply and outreach can reuse it."
+        )
+        if st.button(
+            "🔐 Connect LinkedIn session for automation",
+            key="ln_connect_btn",
+        ):
+            with st.spinner("Opening LinkedIn login window..."):
+                try:
+                    from engines.outreach_agent import connect_linkedin_for_cookies
+
+                    ok, msg = connect_linkedin_for_cookies()
+                    if ok:
+                        st.success(msg)
+                    else:
+                        st.error(msg)
+                except Exception as e:
+                    st.error(f"Could not start LinkedIn connect: {e}")
 
 
 with tab3:
