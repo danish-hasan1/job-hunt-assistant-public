@@ -30,6 +30,14 @@ def get_city_options():
             "Stockholm, Sweden",
             "Vienna, Austria",
             "Zurich, Switzerland",
+            "Copenhagen, Denmark",
+            "Oslo, Norway",
+            "Helsinki, Finland",
+            "Prague, Czech Republic",
+            "Warsaw, Poland",
+            "Budapest, Hungary",
+            "Bucharest, Romania",
+            "Athens, Greece",
             "Bangalore, India",
             "Chennai, India",
             "Delhi, India",
@@ -37,19 +45,40 @@ def get_city_options():
             "Hyderabad, India",
             "Mumbai, India",
             "Pune, India",
+            "Noida, India",
+            "Ghaziabad, India",
+            "Kolkata, India",
+            "Jaipur, India",
+            "Chandigarh, India",
+            "Mohali, India",
+            "Indore, India",
+            "Ahmedabad, India",
+            "Kochi, India",
+            "Trivandrum, India",
+            "Nagpur, India",
+            "Surat, India",
+            "Lucknow, India",
+            "Coimbatore, India",
             "Singapore",
             "Dubai, UAE",
             "Abu Dhabi, UAE",
             "Doha, Qatar",
+            "Riyadh, Saudi Arabia",
+            "Jeddah, Saudi Arabia",
             "New York, USA",
             "Boston, USA",
             "Chicago, USA",
             "San Francisco, USA",
             "Seattle, USA",
+            "Los Angeles, USA",
+            "Austin, USA",
+            "Dallas, USA",
             "Toronto, Canada",
             "Vancouver, Canada",
+            "Montreal, Canada",
             "Sydney, Australia",
             "Melbourne, Australia",
+            "Brisbane, Australia",
             "Auckland, New Zealand",
             "Remote",
             "Hybrid",
@@ -155,10 +184,15 @@ with st.expander("⚙️ Search Settings", expanded=True):
     c1, c2 = st.columns(2)
     profile = st.session_state.get("user_profile", {})
     with c1:
+        default_role = st.session_state.get("search_role", "")
+        if not default_role:
+            roles_from_profile = profile.get("target_roles") or []
+            if roles_from_profile:
+                default_role = roles_from_profile[0]
         role = st.text_input(
             "Job Title",
             placeholder="Head of Talent Acquisition",
-            value=st.session_state.get("search_role", ""),
+            value=default_role,
         )
         preferred_from_profile = profile.get("preferred_locations") or []
         default_locations = st.session_state.get(
@@ -174,10 +208,36 @@ with st.expander("⚙️ Search Settings", expanded=True):
             placeholder="Type to search and select multiple locations",
         )
     with c2:
+        seniority_options = [
+            "Director",
+            "Head",
+            "VP",
+            "Senior Manager",
+            "Associate Director",
+            "Manager",
+        ]
+        default_seniority = st.session_state.get("search_seniority", [])
+        if not default_seniority:
+            text_basis = " ".join(profile.get("target_roles", []) or []).lower()
+            if "associate director" in text_basis:
+                default_seniority.append("Associate Director")
+            if "director" in text_basis:
+                default_seniority.append("Director")
+            if "head" in text_basis:
+                default_seniority.append("Head")
+            if "vp" in text_basis or "vice president" in text_basis:
+                default_seniority.append("VP")
+            if "senior" in text_basis and "manager" in text_basis:
+                default_seniority.append("Senior Manager")
+            if not default_seniority and "manager" in text_basis:
+                default_seniority.append("Manager")
+            if not default_seniority:
+                default_seniority = ["Manager"]
+        default_seniority = [s for s in default_seniority if s in seniority_options]
         seniority = st.multiselect(
             "Seniority",
-            ["Director", "Head", "VP", "Senior Manager", "Associate Director", "Manager"],
-            default=["Director", "Head", "VP", "Senior Manager", "Associate Director"],
+            seniority_options,
+            default=default_seniority,
         )
         other_seniority = st.text_input(
             "Other seniority levels (comma-separated, optional)",
@@ -204,11 +264,14 @@ with col1:
             search_location = ", ".join(locations) if locations else ""
             loc_basis = (search_location or profile.get("location", "") or "").lower()
             track_val = "A" if "india" in loc_basis else "B"
+            effective_location = search_location or profile.get("location", "") or ""
             jobs = search_jobs_serpapi(
                 role or "talent acquisition manager",
-                search_location or "Europe",
+                effective_location,
                 track_val,
                 serpapi_key,
+                40,
+                False,
             )
             if jobs:
                 with st.spinner(f"Scoring {len(jobs)} jobs with AI..."):
@@ -232,29 +295,54 @@ with col1:
 with col2:
     if st.button("🧠 Score All Jobs", use_container_width=True):
         groq_key = st.session_state.get("groq_key", "")
-        if groq_key == "test_mode":
-            st.info("Scoring skipped in test mode")
+        jobs = st.session_state.get("jobs", [])
+        if not jobs:
+            st.warning("No jobs to score yet. Run a search first.")
         else:
-            jobs = st.session_state.get("jobs", [])
-            if not jobs:
-                st.warning("No jobs to score yet. Run a search first.")
-            else:
-                profile = st.session_state.get("user_profile", {})
+            profile = st.session_state.get("user_profile", {})
+            try:
+                from scrapers.scraper_public import score_jobs_with_groq
+
+                with st.spinner(f"Re-scoring {len(jobs)} jobs with updated profile..."):
+                    jobs = score_jobs_with_groq(jobs, profile, groq_key)
+                st.session_state.jobs = jobs
+                st.success("✅ All jobs re-scored")
                 try:
-                    from scrapers.scraper_public import score_jobs_with_groq
+                    from engines.auth import save_user_data
 
-                    with st.spinner(f"Re-scoring {len(jobs)} jobs with updated profile..."):
-                        jobs = score_jobs_with_groq(jobs, profile, groq_key)
-                    st.session_state.jobs = jobs
-                    st.success("✅ All jobs re-scored")
-                    try:
-                        from engines.auth import save_user_data
+                    email = st.session_state.get("user_email", "")
+                    if email:
+                        save_user_data(email, "jobs", jobs)
+                except Exception:
+                    pass
+                st.rerun()
+            except Exception as e:
+                st.error("Could not score jobs. Please check your Groq key and try again.")
 
-                        email = st.session_state.get("user_email", "")
-                        if email:
-                            save_user_data(email, "jobs", jobs)
-                    except Exception:
-                        pass
-                    st.rerun()
-                except Exception as e:
-                    st.error("Could not score jobs. Please check your Groq key and try again.")
+
+st.markdown("---")
+st.subheader("📋 Latest Jobs")
+jobs = st.session_state.get("jobs", [])
+if jobs:
+    df_jobs = pd.DataFrame(jobs)
+    cols = [
+        c
+        for c in [
+            "title",
+            "company",
+            "location",
+            "score",
+            "score_reason",
+            "status",
+            "source",
+            "date_found",
+        ]
+        if c in df_jobs.columns
+    ]
+    if cols:
+        df_view = df_jobs[cols].copy()
+    else:
+        df_view = df_jobs.copy()
+    st.dataframe(df_view, use_container_width=True, hide_index=True)
+else:
+    st.caption("Run a search to see jobs here.")

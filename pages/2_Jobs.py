@@ -2,11 +2,34 @@ import streamlit as st
 from datetime import date
 
 
+def _get_cv_bytes_for_session():
+    cv = st.session_state.get("cv_bytes", None)
+    if cv:
+        return cv
+    try:
+        from engines.auth import load_cv
+
+        email_val = st.session_state.get("user_email", "") or st.session_state.get(
+            "user_profile", {}
+        ).get("email", "")
+        if email_val:
+            loaded_cv = load_cv(email_val)
+            if loaded_cv:
+                st.session_state.cv_bytes = loaded_cv
+                return loaded_cv
+    except Exception:
+        pass
+    return None
+
+
 if not st.session_state.get("logged_in"):
     st.switch_page("pages/login.py")
 
 if "setup_complete" not in st.session_state or not st.session_state.setup_complete:
     st.switch_page("pages/0_Setup.py")
+
+if not st.session_state.get("cv_bytes"):
+    _get_cv_bytes_for_session()
 
 
 st.set_page_config(page_title="💼 Jobs - Job Hunt Assistant", page_icon="💼", layout="wide")
@@ -108,7 +131,17 @@ for job in filtered:
                 st.rerun()
         with cb:
             if st.button("❌ Reject", key=f"rj_{job['id']}"):
-                job["status"] = "rejected"
+                jobs_list = st.session_state.get("jobs", [])
+                remaining = [j for j in jobs_list if j.get("id") != job.get("id")]
+                st.session_state.jobs = remaining
+                try:
+                    from engines.auth import save_user_data
+
+                    email = st.session_state.get("user_email", "")
+                    if email:
+                        save_user_data(email, "jobs", remaining)
+                except Exception:
+                    pass
                 st.rerun()
         with cc:
             if st.button("📄 Generate CV", key=f"cv_{job['id']}"):
@@ -122,7 +155,7 @@ for job in filtered:
 
                     groq_key = st.session_state.get("groq_key", "")
                     profile = st.session_state.get("user_profile", {})
-                    cv_bytes = st.session_state.get("cv_bytes", None)
+                    cv_bytes = _get_cv_bytes_for_session()
                     if not cv_bytes:
                         st.warning("Please upload your CV in setup first")
                     else:
@@ -187,11 +220,12 @@ for job in filtered:
                     pass
                 st.rerun()
         with ce:
-            linkedin_url = job.get("url", "")
-            if linkedin_url and "linkedin.com" in linkedin_url.lower():
-                if st.button("🔗 LinkedIn Easy Apply", key=f"ln_{job['id']}"):
+            source_label = str(job.get("source", "") or "")
+            is_linkedin_source = "linkedin" in source_label.lower()
+            if is_linkedin_source:
+                if st.button("⚡ 1‑Click LinkedIn Apply", key=f"ln_{job['id']}"):
                     profile = st.session_state.get("user_profile", {})
-                    cv_bytes = st.session_state.get("cv_bytes", None)
+                    cv_bytes = _get_cv_bytes_for_session()
                     if not cv_bytes:
                         st.warning("Please upload your CV in setup first")
                     else:
@@ -202,9 +236,9 @@ for job in filtered:
                         ) as tmp:
                             tmp.write(cv_bytes)
                             cv_path = tmp.name
-                        from engines.apply_agent import launch_apply
+                        from engines.apply_agent import launch_apply_one_click
 
-                        success, message = launch_apply(job, cv_path, profile)
+                        success, message = launch_apply_one_click(job, cv_path, profile)
                         if success:
                             st.info(message)
                         else:
@@ -265,8 +299,9 @@ for job in filtered:
                 key=f"emailinput_{job['id']}",
             )
             if to_email and st.button("📧 Send Application", key=f"send_{job['id']}"):
-                if not st.session_state.get(f"cv_ready_{job['id']}"):
-                    st.warning("Generate CV first before sending!")
+                cv_bytes = _get_cv_bytes_for_session()
+                if not cv_bytes:
+                    st.warning("Please upload your CV in setup first")
                 else:
                     with st.spinner("Sending application..."):
                         from engines.email_public import (
@@ -276,7 +311,6 @@ for job in filtered:
                         )
 
                         profile = st.session_state.get("user_profile", {})
-                        cv_bytes = st.session_state.get(f"cv_bytes_{job['id']}")
                         cl_text = st.session_state.get(f"cl_{job['id']}", "")
                         gmail_pass = st.session_state.get("gmail_password", "")
                         subject = build_subject(job, profile)
@@ -331,3 +365,70 @@ for job in filtered:
                             st.rerun()
                         else:
                             st.error(message)
+
+        st.markdown("---")
+        st.markdown("**🤝 LinkedIn Outreach**")
+        from engines.outreach_agent import (
+            find_company_contact,
+            generate_outreach_message,
+            launch_outreach_request,
+        )
+
+        profile = st.session_state.get("user_profile", {})
+        groq_key = st.session_state.get("groq_key", "")
+        contacts_key = f"outreach_contacts_{job['id']}"
+        msgs_key_prefix = f"outreach_msg_{job['id']}_"
+
+        if st.button("🔍 Find People at Company", key=f"find_contacts_{job['id']}"):
+            with st.spinner(f"Searching LinkedIn for people at {job['company']}..."):
+                contacts = find_company_contact(job["company"])
+                st.session_state[contacts_key] = contacts
+
+        contacts = st.session_state.get(contacts_key, [])
+        if contacts:
+            for idx, c in enumerate(contacts):
+                st.markdown(f"**{c['name']}** — {c['role']}")
+                st.caption(c["url"])
+                msg_key = f"{msgs_key_prefix}{idx}"
+                if st.button("✉ Generate Message", key=f"gen_msg_{job['id']}_{idx}"):
+                    message = ""
+                    if groq_key and groq_key != "test_mode":
+                        try:
+                            from groq import Groq
+
+                            client = Groq(api_key=groq_key)
+                            message = generate_outreach_message(
+                                c["name"],
+                                c["company"],
+                                job["title"],
+                                profile,
+                                client,
+                            )
+                        except Exception:
+                            message = ""
+                    if not message:
+                        first_name = c["name"].split()[0]
+                        message = (
+                            f"Hi {first_name}, I’ve been following {c['company']} and your work there. "
+                            f"My background in {', '.join(profile.get('target_roles', [])) or 'talent acquisition'} "
+                            f"seems aligned with roles like {job['title']}. "
+                            "Would you be open to connecting and sharing a quick view of how your team is set up?"
+                        )
+                    st.session_state[msg_key] = message
+                message_val = st.session_state.get(msg_key, "")
+                if message_val:
+                    st.text_area(
+                        "Connection message",
+                        message_val,
+                        height=120,
+                        key=f"msg_area_{job['id']}_{idx}",
+                    )
+                    if st.button(
+                        "🚀 Open LinkedIn & Prefill",
+                        key=f"send_req_{job['id']}_{idx}",
+                    ):
+                        ok, info = launch_outreach_request(c["url"], message_val)
+                        if ok:
+                            st.info(info)
+                        else:
+                            st.error(info)

@@ -47,9 +47,15 @@ with tab1:
                     "target_markets": json.loads(user.get("target_markets", "[]")),
                     "years_experience": user.get("years_experience", 0),
                 }
-                from engines.auth import load_session_data
+                from engines.auth import load_session_data, load_user_data
 
                 keys, jobs, applications, cv_bytes = load_session_data(email)
+                try:
+                    saved_profile = load_user_data(email, "profile") or {}
+                    if saved_profile:
+                        st.session_state.user_profile.update(saved_profile)
+                except Exception:
+                    pass
                 if jobs:
                     st.session_state.jobs = jobs
                 if applications:

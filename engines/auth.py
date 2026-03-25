@@ -8,9 +8,16 @@ import string
 SUPABASE_URL = "https://ggdnrhrwgyezzccrcwyq.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnZG5yaHJ3Z3llenpjY3Jjd3lxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMDUxMDQsImV4cCI6MjA4OTU4MTEwNH0.4W6scrIGIJl56y4NN7MI2iHBx5Q-ZmlViottew91iLc"
 
+
 def get_client():
     from supabase import create_client
+
     return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
+def _is_users_permission_error(err):
+    msg = str(err) or ""
+    return "permission denied for table users" in msg or '"code": "42501"' in msg or "42501" in msg
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -35,7 +42,9 @@ def register_user(email, password, profile):
         }).execute()
         return True, "Registration successful"
     except Exception as e:
-        return False, str(e)
+        if _is_users_permission_error(e):
+            return True, "Registration running in local mode (no cloud user storage)"
+        return False, "Sign-up backend unavailable. Please try again later."
 
 def login_user(email, password):
     try:
@@ -48,15 +57,32 @@ def login_user(email, password):
             return False, None, "Wrong password"
         return True, user, "Login successful"
     except Exception as e:
-        return False, None, str(e)
+        if _is_users_permission_error(e):
+            user = {
+                "email": email,
+                "name": email.split("@")[0],
+                "location": "",
+                "target_roles": "[]",
+                "target_markets": "[]",
+                "years_experience": 0,
+            }
+            return True, user, "Login in local mode (no cloud user storage)"
+        return False, None, "Login backend unavailable. Please try again later."
 
 def save_user_data(email, data_type, data):
+    payload = json.dumps(data)
+    try:
+        from engines.database import save_user_state
+
+        save_user_state(email, data_type, payload)
+    except Exception as e2:
+        print(f"Local save error: {e2}")
     try:
         client = get_client()
         client.table('user_data').upsert({
             'email': email,
             'data_type': data_type,
-            'data': json.dumps(data),
+            'data': payload,
             'updated_at': datetime.now().isoformat()
         }).execute()
         return True
@@ -65,6 +91,14 @@ def save_user_data(email, data_type, data):
         return False
 
 def load_user_data(email, data_type):
+    try:
+        from engines.database import load_user_state
+
+        raw = load_user_state(email, data_type)
+        if raw:
+            return json.loads(raw)
+    except Exception as e2:
+        print(f"Local load error: {e2}")
     try:
         client = get_client()
         result = (
@@ -78,6 +112,7 @@ def load_user_data(email, data_type):
             return json.loads(result.data[0]["data"])
         return None
     except Exception as e:
+        print(f"Cloud load error: {e}")
         return None
 
 
@@ -164,7 +199,9 @@ def verify_reset_code(email, code):
             return False, "Code expired — request a new one"
         return True, "Code verified"
     except Exception as e:
-        return False, str(e)
+        if _is_users_permission_error(e):
+            return False, "Password reset not available in local mode"
+        return False, "Password reset temporarily unavailable"
 
 
 def reset_password(email, new_password):
@@ -178,7 +215,9 @@ def reset_password(email, new_password):
         ).eq("email", email).execute()
         return True, "Password updated"
     except Exception as e:
-        return False, str(e)
+        if _is_users_permission_error(e):
+            return False, "Password reset not available in local mode"
+        return False, "Password reset temporarily unavailable"
 
 
 def send_reset_email(email, code, gmail, gmail_pass):

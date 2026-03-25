@@ -196,6 +196,12 @@ with tab1:
         key="settings_other_target_markets",
     )
     if st.button("💾 Save Profile"):
+        all_roles = target_roles + [
+            r.strip() for r in other_roles.split(",") if r.strip()
+        ]
+        all_markets = target_markets + [
+            m.strip() for m in other_markets.split(",") if m.strip()
+        ]
         st.session_state.user_profile.update(
             {
                 "name": name,
@@ -208,12 +214,26 @@ with tab1:
                 "min_salary": min_salary,
                 "salary_currency": salary_currency,
                 "min_salary_eur": min_salary,
-                "target_roles": target_roles
-                + [r.strip() for r in other_roles.split(",") if r.strip()],
-                "target_markets": target_markets
-                + [m.strip() for m in other_markets.split(",") if m.strip()],
+                "target_roles": all_roles,
+                "target_markets": all_markets,
             }
         )
+        try:
+            from engines.auth import save_user_data
+
+            email_val = st.session_state.get("user_email", "")
+            if email_val:
+                save_user_data(email_val, "profile", st.session_state.user_profile)
+        except Exception:
+            pass
+        if all_roles:
+            st.session_state.search_role = all_roles[0]
+        else:
+            st.session_state.search_role = ""
+        st.session_state.search_locations = all_markets or (
+            [location] if location else []
+        )
+        st.session_state.search_seniority = []
         st.success("✅ Profile saved!")
 
 

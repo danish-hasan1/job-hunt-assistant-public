@@ -246,6 +246,31 @@ def save_outreach(job_id, company, name, role, url, message):
     conn.commit()
     conn.close()
 
+
+def launch_outreach_request(profile_url, message):
+    import subprocess
+    import json
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        json.dump({"url": profile_url, "message": message}, f)
+        temp_path = f.name
+
+    subprocess.Popen(
+        [
+            "python3",
+            "-c",
+            f'''
+import json
+from engines.outreach_agent import send_connection_request
+data = json.load(open("{temp_path}"))
+success, msg = send_connection_request(data["url"], data["message"])
+print("Outreach result:", success, msg)
+''',
+        ]
+    )
+    return True, "LinkedIn outreach window launching..."
+
 if __name__ == "__main__":
     print("Outreach agent ready ✓")
     contacts = find_company_contact('Randstad')

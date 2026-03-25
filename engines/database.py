@@ -53,6 +53,55 @@ def init_db():
     create_hiring_targets_table()
 
 
+def _ensure_user_state_table(conn):
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_state (
+            email TEXT,
+            data_type TEXT,
+            data TEXT,
+            updated_at TEXT,
+            PRIMARY KEY (email, data_type)
+        )
+        """
+    )
+
+
+def save_user_state(email, data_type, data_json):
+    os.makedirs("data", exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        _ensure_user_state_table(conn)
+        conn.execute(
+            """
+            INSERT INTO user_state(email, data_type, data, updated_at)
+            VALUES(?, ?, ?, ?)
+            ON CONFLICT(email, data_type) DO UPDATE SET
+                data=excluded.data,
+                updated_at=excluded.updated_at
+            """,
+            (email, data_type, data_json, datetime.utcnow().isoformat()),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def load_user_state(email, data_type):
+    if not os.path.exists("data"):
+        return None
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        _ensure_user_state_table(conn)
+        row = conn.execute(
+            "SELECT data FROM user_state WHERE email=? AND data_type=?",
+            (email, data_type),
+        ).fetchone()
+        return row[0] if row else None
+    finally:
+        conn.close()
+
+
 def create_hiring_targets_table():
     conn = sqlite3.connect(DB_PATH)
     conn.execute("""
