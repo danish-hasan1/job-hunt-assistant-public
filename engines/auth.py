@@ -49,25 +49,31 @@ def register_user(email, password, profile):
 def login_user(email, password):
     try:
         client = get_client()
-        result = client.table('users').select('*').eq('email', email).execute()
+        result = client.table("users").select("*").eq("email", email).execute()
+
+        err = getattr(result, "error", None)
+        if err:
+            msg = str(getattr(err, "message", err))
+            if _is_users_permission_error(msg):
+                raise Exception(msg)
+            return False, None, msg
+
         if not result.data:
             return False, None, "Email not found"
         user = result.data[0]
-        if user.get('password_hash') != hash_password(password):
+        if user.get("password_hash") != hash_password(password):
             return False, None, "Wrong password"
         return True, user, "Login successful"
     except Exception as e:
-        if _is_users_permission_error(e):
-            user = {
-                "email": email,
-                "name": email.split("@")[0],
-                "location": "",
-                "target_roles": "[]",
-                "target_markets": "[]",
-                "years_experience": 0,
-            }
-            return True, user, "Login in local mode (no cloud user storage)"
-        return False, None, "Login backend unavailable. Please try again later."
+        user = {
+            "email": email,
+            "name": email.split("@")[0],
+            "location": "",
+            "target_roles": "[]",
+            "target_markets": "[]",
+            "years_experience": 0,
+        }
+        return True, user, "Login in local mode (no cloud user storage)"
 
 def save_user_data(email, data_type, data):
     payload = json.dumps(data)
