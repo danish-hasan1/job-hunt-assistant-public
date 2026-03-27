@@ -138,6 +138,10 @@ with st.sidebar:
         f"👤 **{st.session_state.get('user_profile', {}).get('name', '')}**"
     )
     st.caption(st.session_state.get("user_email", ""))
+    if st.button("❓ Tutorial"):
+        st.session_state.onboarding_seen = False
+        st.session_state.onboarding_step = 1
+        st.rerun()
     if st.button("🚪 Logout"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
@@ -177,6 +181,54 @@ with c4:
 
 
 st.markdown("---")
+
+try:
+    from engines.auth import load_user_data, save_user_data
+    email = st.session_state.get("user_email", "")
+    if email and "onboarding_seen" not in st.session_state:
+        ob = load_user_data(email, "onboarding") or {}
+        st.session_state.onboarding_seen = bool(ob.get("seen"))
+except Exception:
+    pass
+
+if not st.session_state.get("onboarding_seen", False):
+    if "onboarding_step" not in st.session_state:
+        st.session_state.onboarding_step = 1
+    step = st.session_state.onboarding_step
+    st.markdown("### Quick Walkthrough")
+    if step == 1:
+        st.info("Step 1: Search on the Home page. Set job title and locations, then click Search Jobs.")
+    elif step == 2:
+        st.info("Step 2: Open the job in the Jobs page. Approve, tailor CV and cover letter.")
+    elif step == 3:
+        st.info("Step 3: Apply. Use Open LinkedIn Job or Email Application with a generated template.")
+    elif step == 4:
+        st.info("Step 4: Track in Applications. Update status and set follow-up dates.")
+    elif step == 5:
+        st.info("Step 5: Outreach. Find hiring managers and copy a connection note.")
+    cta1, cta2, cta3 = st.columns(3)
+    with cta1:
+        if st.button("Skip"):
+            st.session_state.onboarding_seen = True
+            try:
+                if email:
+                    save_user_data(email, "onboarding", {"seen": True})
+            except Exception:
+                pass
+            st.rerun()
+    with cta2:
+        if st.button("Next"):
+            st.session_state.onboarding_step = min(step + 1, 5)
+            st.rerun()
+    with cta3:
+        if st.button("Finish"):
+            st.session_state.onboarding_seen = True
+            try:
+                if email:
+                    save_user_data(email, "onboarding", {"seen": True})
+            except Exception:
+                pass
+            st.rerun()
 
 
 st.subheader("🔍 Find Jobs")
@@ -344,5 +396,23 @@ if jobs:
     else:
         df_view = df_jobs.copy()
     st.dataframe(df_view, use_container_width=True, hide_index=True)
+    selectable = [j for j in jobs if j.get("id") is not None]
+    if selectable:
+        labels = [
+            f"{j.get('title','')} | {j.get('company','')} | {j.get('location','')}"
+            for j in selectable
+        ]
+        id_map = {label: j.get("id") for label, j in zip(labels, selectable)}
+        choice = st.selectbox(
+            "Open a job in the Jobs page",
+            ["Select a job..."] + labels,
+            index=0,
+            key="home_job_jump",
+        )
+        if choice != "Select a job..." and st.button(
+            "Go to this job in Jobs", key="home_job_jump_btn"
+        ):
+            st.session_state["focus_job_id"] = id_map.get(choice)
+            st.switch_page("pages/2_Jobs.py")
 else:
     st.caption("Run a search to see jobs here.")

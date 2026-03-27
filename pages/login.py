@@ -18,7 +18,7 @@ h1,h2,h3,p,label,.stMarkdown{color:white!important}
 
 
 st.title("🎯 Job Hunt Assistant")
-st.caption("AI-powered job search — free forever")
+st.caption("AI-powered job search")
 st.markdown("---")
 
 if "legal_accept" not in st.session_state:
@@ -89,6 +89,11 @@ with tab1:
                     st.session_state.gmail_address = keys.get("gmail", "")
                     st.session_state.gmail_password = keys.get("gmail_pass", "")
                     st.session_state.gemini_key = keys.get("gemini", "")
+                try:
+                    ob = load_user_data(email, "onboarding") or {}
+                    st.session_state.onboarding_seen = bool(ob.get("seen"))
+                except Exception:
+                    st.session_state.onboarding_seen = False
                 st.session_state.setup_complete = True
                 st.success(f"Welcome back, {user.get('name','')}!")
                 st.switch_page("pages/1_Home.py")
@@ -100,7 +105,7 @@ with tab1:
 
 with tab2:
     st.subheader("Create your account")
-    st.caption("Takes 2 minutes — completely free")
+    st.caption("Takes 2 minutes")
     method = st.radio(
         "Sign-up method",
         ["Email + password", "LinkedIn profile"],
@@ -151,6 +156,7 @@ with tab2:
                             "name": reg_name,
                             "email": reg_email,
                         }
+                        st.session_state.onboarding_seen = False
                         st.session_state.setup_complete = False
                         st.success("Account created! Let's set up your profile.")
                         st.switch_page("pages/0_Setup.py")
@@ -205,6 +211,7 @@ with tab2:
                         "email": li_email,
                         "linkedin_profile": li_profile,
                     }
+                    st.session_state.onboarding_seen = False
                     st.session_state.setup_complete = False
                     st.success(
                         "Account created via LinkedIn! Let's set up your profile."

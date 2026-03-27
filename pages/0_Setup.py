@@ -150,7 +150,7 @@ def show_progress(current):
 
 
 st.title("🎯 Job Hunt Assistant")
-st.caption("Your personal AI-powered job search — free forever")
+st.caption("Your personal AI-powered job search")
 st.markdown("---")
 show_progress(st.session_state.setup_step)
 st.markdown("---")
@@ -439,7 +439,7 @@ elif st.session_state.setup_step == 2:
 
 elif st.session_state.setup_step == 3:
     st.subheader("🔑 Step 3: API Keys")
-    st.caption("All free. Never stored — stays in your browser session only.")
+    st.caption("Keys are not stored permanently — they stay in your browser session only.")
     existing_groq = st.session_state.get("groq_key", "")
     existing_serp = st.session_state.get("serpapi_key", "")
     existing_gmail = st.session_state.get("gmail_address", "")
@@ -472,8 +472,8 @@ elif st.session_state.setup_step == 3:
     st.markdown("**🤖 Groq API Key** (Required)")
     st.markdown(" `https://console.groq.com` ")
     st.caption(
-        "Create a free Groq account, go to API Keys in the console, generate a key "
-        "starting with `gsk_` and paste it here."
+        "Create a Groq account, go to API Keys in the console, generate a key starting "
+        "with `gsk_` and paste it here."
     )
     groq_key = st.text_input(
         "Groq API Key",
@@ -534,7 +534,7 @@ elif st.session_state.setup_step == 3:
         )
         st.markdown("**SerpAPI Key – detailed steps**")
         st.markdown(
-            """1. Go to https://serpapi.com and create a free account  
+            """1. Go to https://serpapi.com and create an account  
 2. After login, go to your dashboard  
 3. Find the “API Key” box at the top of the page  
 4. Click to copy the key  

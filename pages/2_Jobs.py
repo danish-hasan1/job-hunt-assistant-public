@@ -334,26 +334,52 @@ for job in filtered:
             source_label = str(job.get("source", "") or "")
             is_linkedin_source = "linkedin" in source_label.lower()
             if is_linkedin_source:
-                if st.button("⚡ 1‑Click LinkedIn Apply", key=f"ln_{job['id']}"):
-                    profile = st.session_state.get("user_profile", {})
-                    cv_bytes = _get_cv_bytes_for_session()
-                    if not cv_bytes:
-                        st.warning("Please upload your CV in setup first")
-                    else:
-                        import tempfile, os
-
-                        with tempfile.NamedTemporaryFile(
-                            delete=False, suffix=".pdf"
-                        ) as tmp:
-                            tmp.write(cv_bytes)
-                            cv_path = tmp.name
-                        from engines.apply_agent import launch_apply_one_click
-
-                        success, message = launch_apply_one_click(job, cv_path, profile)
-                        if success:
-                            st.info(message)
+                try:
+                    from engines.apply_agent import (
+                        PLAYWRIGHT_AVAILABLE as APPLY_PLAYWRIGHT,
+                        launch_apply_one_click,
+                    )
+                except Exception:
+                    APPLY_PLAYWRIGHT = False
+                    launch_apply_one_click = None
+                if APPLY_PLAYWRIGHT and launch_apply_one_click is not None:
+                    if st.button("⚡ 1‑Click LinkedIn Apply", key=f"ln_{job['id']}"):
+                        profile = st.session_state.get("user_profile", {})
+                        cv_bytes = _get_cv_bytes_for_session()
+                        if not cv_bytes:
+                            st.warning("Please upload your CV in setup first")
                         else:
-                            st.error(message)
+                            import tempfile, os
+
+                            with tempfile.NamedTemporaryFile(
+                                delete=False, suffix=".pdf"
+                            ) as tmp:
+                                tmp.write(cv_bytes)
+                                cv_path = tmp.name
+                            success, message = launch_apply_one_click(
+                                job, cv_path, profile
+                            )
+                            if success:
+                                st.info(message)
+                            else:
+                                st.error(message)
+                else:
+                    job_url = job.get("url", "")
+                    if job_url:
+                        st.link_button(
+                            "🔗 Open LinkedIn Job",
+                            job_url,
+                            key=f"ln_open_{job['id']}",
+                            use_container_width=True,
+                        )
+                        st.caption(
+                            "LinkedIn 1‑click automation requires Playwright. "
+                            "You can still apply manually after opening the job."
+                        )
+                    else:
+                        st.caption(
+                            "LinkedIn automation is not available here. Use the View Job link above to open this role."
+                        )
 
         if st.session_state.get(f"cv_ready_{job['id']}"):
             st.info("📄 **Tailored Summary:**")

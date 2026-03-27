@@ -20,10 +20,8 @@ h1,h2,h3,p,label,.stMarkdown{color:white!important}
 st.markdown(
     """ 
 <div class="hero"> 
-    <div class="tag">FREE FOREVER</div> 
-    <br><br> 
     <h1 style="font-size:3.5em;font-weight:900;color:white">🎯 Job Hunt Assistant</h1> 
-    <h3 style="color:#aaa;font-weight:300">Your personal AI-powered job search — finds jobs, tailors your CV,<br>and applies for you. Completely free.</h3> 
+    <h3 style="color:#aaa;font-weight:300">Your personal AI-powered job search — finds jobs, tailors your CV,<br>and helps you apply faster.</h3> 
 </div> 
 """,
     unsafe_allow_html=True,
@@ -31,7 +29,7 @@ st.markdown(
 
 col1, col2, col3 = st.columns([1, 1, 1])
 with col2:
-    if st.button("🚀 Get Started — It's Free", use_container_width=True):
+    if st.button("🚀 Get Started", use_container_width=True):
         st.switch_page("pages/login.py")
 
 st.markdown("---")
@@ -125,4 +123,3 @@ with c4:
 </div>""",
         unsafe_allow_html=True,
     )
-

@@ -431,9 +431,9 @@ with tab5:
         )
 
         st.markdown("**Share message:**")
-        share_msg = f"""Hey! I've been using this free AI-powered job search tool called Job Hunt Assistant. 
+        share_msg = f"""Hey! I've been using this AI-powered job search tool called Job Hunt Assistant. 
 
- It finds jobs across the internet, scores them against your profile, tailors your CV automatically and even helps prep for interviews — all free! 
+ It finds jobs across the internet, scores them against your profile, tailors your CV automatically and even helps prep for interviews. 
 
  Sign up here: {referral_url}"""
         st.text_area("Copy and share:", share_msg, height=150, key="share_msg")
